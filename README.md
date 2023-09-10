@@ -2,6 +2,8 @@ I took blue-dev's code for the [orginal arena latency slider mod](https://github
 
 ## Installation
 
+Make sure you have skyline installed: https://github.com/skyline-dev/skyline/releases
+
 Download `liblocal_latency_slider.nro` from the release page.
 Place it in the corresponding folder. This is how it should look:
 
