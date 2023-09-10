@@ -66,7 +66,6 @@ unsafe fn set_online_latency(ctx: &InlineCtx) {
         MOST_RECENT_AUTO = auto as isize;
         if CURRENT_INPUT_BUFFER != -1 {
             *(*ctx.registers[19].x.as_ref() as *mut u8) = CURRENT_INPUT_BUFFER as u8;
-            println!("STARTING ONLINE MATCH WITH LATENCY SET TO {} FRAMES", CURRENT_INPUT_BUFFER);
         }
     }
 }
