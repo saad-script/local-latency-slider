@@ -1,5 +1,5 @@
 [package]
-name = "arena-latency-slider"
+name = "local-latency-slider"
 version = "0.1.0"
 authors = []
 edition = "2021"
