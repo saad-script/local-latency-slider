@@ -33,31 +33,35 @@ unsafe fn update_latency_display(pane_handle: u64) {
         if MOST_RECENT_AUTO == -1 {
             set_text_string(
                 pane_handle,
-                format!("Input Delay: Auto\0").as_ptr(),
+                format!("Auto\0").as_ptr(),
             );
         } else {
             set_text_string(
                 pane_handle,
-                format!("Input Delay: Auto ({}f)\0", MOST_RECENT_AUTO).as_ptr()
+                format!("Auto({}f)\0", MOST_RECENT_AUTO).as_ptr()
             )
         }
     } else {
         set_text_string(
             pane_handle, 
-            format!("Input Delay: {}f\0", CURRENT_INPUT_BUFFER).as_ptr()
+            format!("{}f\0", CURRENT_INPUT_BUFFER).as_ptr()
         );
     }
 }
 
-#[skyline::hook(offset = 0x1a12460)]
-unsafe fn update_chara_select_screen(arg: u64) {
-    if IS_LOCAL_ONLINE {
-        poll_input_update_delay();
-        let pane_handle = *((*((arg + 0xe58) as *const u64) + 0x10) as *const u64);
-        update_latency_display(pane_handle);
-    }
-    call_original!(arg);
-}
+// This only updates the host's (p1) latency display. Can't find a reference to p2's pane handle :(
+// #[skyline::hook(offset = 0x1a12460)]
+// unsafe fn update_chara_select_screen(arg: u64) {
+//     println!("IS IN CHAR SELECT SCREEN");
+//     if IS_LOCAL_ONLINE {
+//         poll_input_update_delay();
+//         let pane_handle = *((*((arg + 0xe58) as *const u64) + 0x10) as *const u64);
+//         update_latency_display(pane_handle);
+//         let pane_handle2 = *((*((arg + 0xe68) as *const u64) + 0x10) as *const u64);
+//         update_latency_display(pane_handle2);
+//     }
+//     call_original!(arg);
+// }
 
 #[skyline::hook(offset = 0x16cdb08, inline)]
 unsafe fn set_online_latency(ctx: &InlineCtx) {
@@ -90,6 +94,23 @@ unsafe fn local_wireless_seq(_: &InlineCtx) {
     IS_LOCAL_ONLINE = true;
 }
 
+static mut PANE_HANDLE: u64 = 0;
+#[skyline::hook(offset = 0x1bd3ae0, inline)]
+unsafe fn store_local_room_pane(ctx: &InlineCtx) {
+    if PANE_HANDLE == 0 {
+        PANE_HANDLE = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
+    }
+}
+
+#[skyline::hook(offset = 0x1bd6f40, inline)]
+unsafe fn update_local_room(_: &InlineCtx) {
+    if PANE_HANDLE == 0 {
+        return;
+    }
+    poll_input_update_delay();
+    update_latency_display(PANE_HANDLE);
+}
+
 #[skyline::main(name = "local-latency-slider")]
 pub unsafe fn main() {
     skyline::install_hooks!(
@@ -97,7 +118,8 @@ pub unsafe fn main() {
         online_melee_any_scene_create,
         bg_matchmaking_seq,
         local_wireless_seq,
-        update_chara_select_screen,
+        store_local_room_pane,
+        update_local_room,
         set_online_latency
     );
 }
