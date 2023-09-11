@@ -31,21 +31,39 @@ unsafe fn poll_input_update_delay() {
 unsafe fn update_latency_display(pane_handle: u64) {
     if CURRENT_INPUT_BUFFER == -1 {
         if MOST_RECENT_AUTO == -1 {
-            set_text_string(
-                pane_handle,
-                format!("Auto\0").as_ptr(),
-            );
+            set_text_string(pane_handle, format!("Auto\0").as_ptr());
         } else {
             set_text_string(
                 pane_handle,
-                format!("Auto({}f)\0", MOST_RECENT_AUTO).as_ptr()
+                format!("Auto({}f)\0", MOST_RECENT_AUTO).as_ptr(),
             )
         }
     } else {
-        set_text_string(
-            pane_handle, 
-            format!("{}f\0", CURRENT_INPUT_BUFFER).as_ptr()
-        );
+        set_text_string(pane_handle, format!("{}f\0", CURRENT_INPUT_BUFFER).as_ptr());
+    }
+}
+
+#[skyline::hook(offset = 0x37a0c40, inline)]
+unsafe fn update_pane(ctx: &InlineCtx) {
+    let pane_ptr = *ctx.registers[0].x.as_ref() as *const u64;
+    let buffer = *ctx.registers[1].x.as_ref() as *mut u16; // &u64 -> *mut u16
+    let length = *ctx.registers[2].w.as_ref() as u32;
+
+    let raw = std::slice::from_raw_parts(buffer, length as usize);
+
+    if raw.iter().all(|&n| n > 31 && n < 123) {
+        let str: String = raw.iter().copied().map(|c| c as u8 as char).collect();
+        println!("PANE {:p} CONTAINS {} {:?}", pane_ptr, str, raw);
+    }
+
+    let solo_battle = b"Solo Battle";
+    if raw.len() == solo_battle.len()
+        && raw
+            .iter()
+            .zip(solo_battle)
+            .all(|(wide, short)| *wide == *short as u16)
+    {
+        println!("{:p}->{}", pane_ptr, *pane_ptr);
     }
 }
 
@@ -94,7 +112,8 @@ static mut LOCAL_ROOM_PANE_HANDLE: u64 = 0;
 #[skyline::hook(offset = 0x1bd3ae0, inline)]
 unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
     IS_LOCAL_ONLINE = true;
-    LOCAL_ROOM_PANE_HANDLE = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
+    LOCAL_ROOM_PANE_HANDLE =
+        *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
 }
 
 #[skyline::hook(offset = 0x1bd6f40, inline)]
@@ -114,6 +133,7 @@ pub unsafe fn main() {
         bg_matchmaking_seq,
         store_local_menu_pane,
         update_local_menu,
-        set_online_latency
+        set_online_latency,
+        update_pane,
     );
 }
