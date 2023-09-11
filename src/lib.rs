@@ -89,26 +89,21 @@ unsafe fn main_menu(_: &InlineCtx) {
     IS_LOCAL_ONLINE = false;
 }
 
-#[skyline::hook(offset = 0x232f7c0, inline)]
-unsafe fn local_wireless_seq(_: &InlineCtx) {
-    IS_LOCAL_ONLINE = true;
-}
-
-static mut PANE_HANDLE: u64 = 0;
+// called on local online menu init
+static mut LOCAL_ROOM_PANE_HANDLE: u64 = 0;
 #[skyline::hook(offset = 0x1bd3ae0, inline)]
-unsafe fn store_local_room_pane(ctx: &InlineCtx) {
-    if PANE_HANDLE == 0 {
-        PANE_HANDLE = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
-    }
+unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
+    IS_LOCAL_ONLINE = true;
+    LOCAL_ROOM_PANE_HANDLE = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
 }
 
 #[skyline::hook(offset = 0x1bd6f40, inline)]
-unsafe fn update_local_room(_: &InlineCtx) {
-    if PANE_HANDLE == 0 {
+unsafe fn update_local_menu(_: &InlineCtx) {
+    if LOCAL_ROOM_PANE_HANDLE == 0 {
         return;
     }
     poll_input_update_delay();
-    update_latency_display(PANE_HANDLE);
+    update_latency_display(LOCAL_ROOM_PANE_HANDLE);
 }
 
 #[skyline::main(name = "local-latency-slider")]
@@ -117,9 +112,8 @@ pub unsafe fn main() {
         main_menu,
         online_melee_any_scene_create,
         bg_matchmaking_seq,
-        local_wireless_seq,
-        store_local_room_pane,
-        update_local_room,
+        store_local_menu_pane,
+        update_local_menu,
         set_online_latency
     );
 }
