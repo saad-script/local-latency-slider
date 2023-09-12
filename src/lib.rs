@@ -1,4 +1,5 @@
 use skyline::hooks::InlineCtx;
+use skyline::nn::ui2d::{Pane, Layout};
 
 static mut CURRENT_INPUT_BUFFER: isize = 4;
 static mut MOST_RECENT_AUTO: isize = -1;
@@ -9,6 +10,12 @@ const MIN_INPUT_BUFFER: isize = -1;
 
 #[skyline::from_offset(0x37a1270)]
 unsafe fn set_text_string(pane: u64, string: *const u8);
+
+#[skyline::from_offset(0x59970)]
+pub unsafe fn find_pane_by_name_recursive(
+    pane: *const Pane,
+    s: *const u8,
+) -> *mut Pane;
 
 unsafe fn poll_input_update_delay() {
     static mut CURRENT_COUNTER: usize = 0;
@@ -28,40 +35,26 @@ unsafe fn poll_input_update_delay() {
     CURRENT_INPUT_BUFFER = CURRENT_INPUT_BUFFER.clamp(MIN_INPUT_BUFFER, MAX_INPUT_BUFFER);
 }
 
-unsafe fn update_latency_display(pane_handle: u64) {
+unsafe fn update_latency_display(header: &str, pane_handle: u64) {
     if CURRENT_INPUT_BUFFER == -1 {
         if MOST_RECENT_AUTO == -1 {
             set_text_string(
                 pane_handle,
-                format!("Auto\0").as_ptr(),
+                format!("{}Auto\0", header).as_ptr(),
             );
         } else {
             set_text_string(
                 pane_handle,
-                format!("Auto({}f)\0", MOST_RECENT_AUTO).as_ptr()
+                format!("{}Auto ({}f)\0", header, MOST_RECENT_AUTO).as_ptr()
             )
         }
     } else {
         set_text_string(
             pane_handle, 
-            format!("{}f\0", CURRENT_INPUT_BUFFER).as_ptr()
+            format!("{}{}f\0",header, CURRENT_INPUT_BUFFER).as_ptr()
         );
     }
 }
-
-// This only updates the host's (p1) latency display. Can't find a reference to p2's pane handle :(
-// #[skyline::hook(offset = 0x1a12460)]
-// unsafe fn update_chara_select_screen(arg: u64) {
-//     println!("IS IN CHAR SELECT SCREEN");
-//     if IS_LOCAL_ONLINE {
-//         poll_input_update_delay();
-//         let pane_handle = *((*((arg + 0xe58) as *const u64) + 0x10) as *const u64);
-//         update_latency_display(pane_handle);
-//         let pane_handle2 = *((*((arg + 0xe68) as *const u64) + 0x10) as *const u64);
-//         update_latency_display(pane_handle2);
-//     }
-//     call_original!(arg);
-// }
 
 #[skyline::hook(offset = 0x16cdb08, inline)]
 unsafe fn set_online_latency(ctx: &InlineCtx) {
@@ -103,7 +96,45 @@ unsafe fn update_local_menu(_: &InlineCtx) {
         return;
     }
     poll_input_update_delay();
-    update_latency_display(LOCAL_ROOM_PANE_HANDLE);
+    update_latency_display("", LOCAL_ROOM_PANE_HANDLE);
+}
+
+// only works for host (p1) for some reason.
+static mut IS_IN_CSS: bool = false;
+#[skyline::hook(offset = 0x1a12460)]
+unsafe fn update_css(arg: u64) {
+    if IS_LOCAL_ONLINE {
+        let pane = *((*((arg + 0xe58) as *const u64) + 0x10) as *const u64);
+        poll_input_update_delay();
+        update_latency_display("Input Delay: ", pane);
+    }
+    IS_IN_CSS = true;
+    call_original!(arg);
+}
+
+// current workaround for css delay display not showing on client (p2).
+#[skyline::hook(offset = 0x4b640, inline)]
+unsafe fn on_draw_ui2d(ctx: &InlineCtx) {
+
+    if !IS_LOCAL_ONLINE || !IS_IN_CSS {
+        return;
+    }
+
+    let layout = *ctx.registers[0].x.as_ref() as *mut Layout;
+    let layout_name = skyline::from_c_str((*layout).layout_name);
+    let root_pane = (*layout).root_pane;
+
+    if layout_name == "chara_select_base" {
+        let result = find_pane_by_name_recursive(root_pane, "set_txt_title_00\0".as_ptr());
+        if result != std::ptr::null_mut() {
+            let tb = result as u64;
+            update_latency_display("Input Delay: ", tb);
+        }
+    }
+
+    IS_IN_CSS = layout_name == "chara_select_base" || 
+                layout_name == "chara_select" || 
+                layout_name == "select_bg";
 }
 
 #[skyline::main(name = "local-latency-slider")]
@@ -114,6 +145,8 @@ pub unsafe fn main() {
         bg_matchmaking_seq,
         store_local_menu_pane,
         update_local_menu,
-        set_online_latency
+        set_online_latency,
+        update_css,
+        on_draw_ui2d,
     );
 }
