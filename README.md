@@ -11,7 +11,7 @@ Place it in the corresponding folder. This is how it should look:
 
 ## Usage
 
-When your in the character select screen (for local online), you can press DPAD left/right to adjust the delay.
+When your in the local online menu or in the character select screen (for local online), you can press DPAD left/right to adjust the delay.
 
 Ideally you would want to use this on an emulator like yuzu and combine it with the 120 fps mod. This will give you very close to native delay when playing online on LDN.
 
@@ -22,7 +22,7 @@ Currently there is an issue with playing local online with skyline on yuzu that 
 1) Download this online fix: https://drive.google.com/file/d/1NX8Cbhax3vafTPUpp7r401oZea-Wtmi5/view
 2) Place the files in `%yuzu_folder%/sdmc/atmosphere/contents/01006A800016E000/exefs/`
 3) Open yuzu but DONT connect to yuzu LDN yet. First start smash.
-4) Once your in the smash main menu you can connect to yuzu LDN. Itll give you a warning that the game is already running which you can ignore.
+4) Once your in the smash main menu you can connect to yuzu LDN. It'll give you a warning that the game is already running which you can ignore.
 5) Open the local wireless menu and play.
 
 
