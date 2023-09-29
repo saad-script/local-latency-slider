@@ -134,7 +134,8 @@ unsafe fn on_draw_ui2d(ctx: &InlineCtx) {
 
     IS_IN_CSS = layout_name == "chara_select_base" || 
                 layout_name == "chara_select" || 
-                layout_name == "select_bg";
+                layout_name == "select_bg" ||
+                layout_name == "tournament_bg";
 }
 
 #[skyline::main(name = "local-latency-slider")]
