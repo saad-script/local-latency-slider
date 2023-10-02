@@ -11,7 +11,6 @@ const MIN_INPUT_BUFFER: isize = -1;
 #[skyline::from_offset(0x37a1270)]
 unsafe fn set_text_string(pane: u64, string: *const u8);
 
-
 unsafe fn poll_input_update_delay() {
     static mut CURRENT_COUNTER: usize = 0;
     if ninput::any::is_press(ninput::Buttons::RIGHT) {
@@ -40,13 +39,13 @@ unsafe fn update_latency_display(header: &str, pane_handle: u64) {
         } else {
             set_text_string(
                 pane_handle,
-                format!("{}Auto ({}f)\0", header, MOST_RECENT_AUTO).as_ptr()
+                format!("{}Auto ({}f)\0", header, MOST_RECENT_AUTO).as_ptr(),
             )
         }
     } else {
         set_text_string(
             pane_handle, 
-            format!("{}{}f\0",header, CURRENT_INPUT_BUFFER).as_ptr()
+            format!("{}{}f\0",header, CURRENT_INPUT_BUFFER).as_ptr(),
         );
     }
 }
@@ -108,7 +107,6 @@ unsafe fn update_css(arg: u64) {
         update_latency_display("Input Delay: ", p1_pane as u64);
         update_latency_display("Input Delay: ", p2_pane as u64);
     }
-
     call_original!(arg);
 }
 
