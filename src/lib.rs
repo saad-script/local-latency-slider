@@ -32,10 +32,7 @@ unsafe fn poll_input_update_delay() {
 unsafe fn update_latency_display(header: &str, pane_handle: u64) {
     if CURRENT_INPUT_BUFFER == -1 {
         if MOST_RECENT_AUTO == -1 {
-            set_text_string(
-                pane_handle,
-                format!("{}Auto\0", header).as_ptr(),
-            );
+            set_text_string(pane_handle, format!("{}Auto\0", header).as_ptr());
         } else {
             set_text_string(
                 pane_handle,
@@ -44,8 +41,8 @@ unsafe fn update_latency_display(header: &str, pane_handle: u64) {
         }
     } else {
         set_text_string(
-            pane_handle, 
-            format!("{}{}f\0",header, CURRENT_INPUT_BUFFER).as_ptr(),
+            pane_handle,
+            format!("{}{}f\0", header, CURRENT_INPUT_BUFFER).as_ptr(),
         );
     }
 }
@@ -81,7 +78,8 @@ static mut LOCAL_ROOM_PANE_HANDLE: u64 = 0;
 #[skyline::hook(offset = 0x1bd3ae0, inline)]
 unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
     IS_LOCAL_ONLINE = true;
-    LOCAL_ROOM_PANE_HANDLE = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
+    LOCAL_ROOM_PANE_HANDLE =
+        *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
 }
 
 #[skyline::hook(offset = 0x1bd6f40, inline)]
