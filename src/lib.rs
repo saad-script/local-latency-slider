@@ -39,5 +39,5 @@ pub fn main() {
     framerate::install();
     latency::install();
 
-    skyline::install_hooks!(update_css,);
+    skyline::install_hook!(update_css);
 }

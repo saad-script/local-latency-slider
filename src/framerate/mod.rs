@@ -102,7 +102,7 @@ pub unsafe fn poll() {
 }
 
 pub fn install() {
-    skyline::install_hooks!(scene_update, on_game_speed_calc,);
+    skyline::install_hooks!(scene_update, on_game_speed_calc);
 
     #[skyline::from_offset(0x39bf580)]
     fn get_tick_freq() -> u64;
