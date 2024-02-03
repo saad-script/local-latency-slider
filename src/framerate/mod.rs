@@ -3,6 +3,10 @@ use skyline::hooks::InlineCtx;
 use crate::latency;
 use crate::utils;
 
+const DEFAULT_TARGET_FRAME_RATE: u32 = 60;
+const MAX_TARGET_FRAME_RATE: u32 = 240;
+const TARGET_FRAME_RATE_INC: u32 = 60;
+
 static mut TARGET_FRAME_RATE: u32 = 60;
 static mut VSYNC_ENABLED: bool = true;
 static mut TICK_FREQ: u64 = 0;
@@ -59,9 +63,9 @@ pub unsafe fn set_framerate_target(framerate_target: u32) {
 
 pub unsafe fn set_vsync_enabled(enabled: bool) {
     VSYNC_ENABLED = enabled;
-    match (VSYNC_ENABLED, TARGET_FRAME_RATE >= 120) {
-        (true, true) => set_swap_interval(-1 * ((TARGET_FRAME_RATE / 120) - 1) as i32),
-        (false, _) => set_swap_interval(-499),
+    match (VSYNC_ENABLED, TARGET_FRAME_RATE == 60) {
+        (true, false) => set_swap_interval(((TARGET_FRAME_RATE as f64 / 60.0) * 100.0) as i32),
+        (false, _) => set_swap_interval(10000),
         _ => set_swap_interval(1),
     }
 }
@@ -83,22 +87,22 @@ pub unsafe fn poll() {
     match pressed_buttons {
         ninput::Buttons::UP => {
             if VSYNC_ENABLED {
-                TARGET_FRAME_RATE *= 2;
+                TARGET_FRAME_RATE += TARGET_FRAME_RATE_INC;
             }
         }
         ninput::Buttons::DOWN => {
             if VSYNC_ENABLED {
-                TARGET_FRAME_RATE /= 2;
+                TARGET_FRAME_RATE -= TARGET_FRAME_RATE_INC;
             }
         }
         ninput::Buttons::X => {
-            if TARGET_FRAME_RATE == 60 {
+            if TARGET_FRAME_RATE == DEFAULT_TARGET_FRAME_RATE {
                 VSYNC_ENABLED = !VSYNC_ENABLED;
             }
         }
         _ => (),
     }
-    TARGET_FRAME_RATE = TARGET_FRAME_RATE.clamp(60, 240);
+    TARGET_FRAME_RATE = TARGET_FRAME_RATE.clamp(DEFAULT_TARGET_FRAME_RATE, MAX_TARGET_FRAME_RATE);
 }
 
 pub fn install() {
