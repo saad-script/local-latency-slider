@@ -21,7 +21,7 @@ Place it in the corresponding folder. This is how it should look:
 - Due to a current yuzu bug, make sure to connect to LDN **after** launching smash. Otherwise yuzu will crash when loading the game.
 - In the character select screen, you can do any of the following:
   - Use DPAD left/right to change the online delay set by the game.
-  - Use DPAD up/down to change the target framerate. 120 fps removes 3f of delay, and 240 fps removes 4.5 frames of delay.
+  - Use DPAD up/down to change the target framerate. 120 fps removes 3f of delay, 180 fps removes 4 frames of delay, and 240 fps removes 4.5 frames of delay.
   - Press X to toggle VSYNC on/off (only available when playing on 60 fps). This is useful if you dont have a PC capable of reaching higher framerates like 120 fps, but still want to enjoy the lower delay. This can remove upto 3 frames of delay.
 
 ## Troubleshooting & FAQ

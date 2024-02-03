@@ -10,7 +10,7 @@ pub fn poll_buttons(buttons: Vec<ninput::Buttons>) -> ninput::Buttons {
         unsafe {
             match (PRESS_COOLDOWN, is_pressed) {
                 (Some(t), _) => {
-                    if t.elapsed().as_millis() > 166 {
+                    if t.elapsed().as_millis() > 167 {
                         PRESS_COOLDOWN = None;
                     }
                 }
