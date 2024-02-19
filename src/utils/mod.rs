@@ -1,12 +1,24 @@
 use std::time::Instant;
 
-#[skyline::from_offset(0x37a1270)]
+extern "C" {
+    #[link_name = "\u{1}_ZN2nn2os22GetSystemTickFrequencyEv"]
+    pub fn get_tick_freq() -> u64;
+}
+
+#[skyline::from_offset(0x37a1ef0)]
 pub fn set_text_string(pane: u64, string: *const u8);
 
-pub fn poll_buttons(buttons: Vec<ninput::Buttons>) -> ninput::Buttons {
+pub fn is_yuzu_emulator() -> bool {
+    unsafe {
+        let base_address = skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as u64;
+        return base_address == 0x80004000;
+    }
+}
+
+pub fn poll_buttons(buttons: &[ninput::Buttons]) -> ninput::Buttons {
     static mut PRESS_COOLDOWN: Option<Instant> = None;
     for button in buttons {
-        let is_pressed = ninput::any::is_press(button);
+        let is_pressed = ninput::any::is_press(*button);
         unsafe {
             match (PRESS_COOLDOWN, is_pressed) {
                 (Some(t), _) => {
@@ -16,7 +28,7 @@ pub fn poll_buttons(buttons: Vec<ninput::Buttons>) -> ninput::Buttons {
                 }
                 (None, true) => {
                     PRESS_COOLDOWN = Some(Instant::now());
-                    return button;
+                    return *button;
                 }
                 _ => PRESS_COOLDOWN = None,
             }
