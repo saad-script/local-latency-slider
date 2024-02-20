@@ -4,7 +4,7 @@ mod framerate;
 mod latency;
 mod utils;
 
-#[skyline::hook(offset = 0x1a12460)]
+#[skyline::hook(offset = 0x1a12f40)]
 unsafe fn update_css(arg: u64) {
     if latency::is_local_online() {
         // pointer to p1's text pane
@@ -36,8 +36,16 @@ unsafe fn update_css(arg: u64) {
 
 #[skyline::main(name = "local-latency-slider")]
 pub fn main() {
+    if !utils::is_yuzu_emulator() {
+        skyline::error::show_error(
+            1,
+            "Compatibility Error",
+            "Local Latency Slider mod is currently only supported on yuzu emulator",
+        );
+        return;
+    }
+
     framerate::install();
     latency::install();
-
     skyline::install_hook!(update_css);
 }

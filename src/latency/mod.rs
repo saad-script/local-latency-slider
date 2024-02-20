@@ -51,7 +51,7 @@ static mut CURRENT_INPUT_DELAY: Delay = Delay {
 static mut IS_LOCAL_ONLINE: bool = false;
 static mut LOCAL_ROOM_PANE_HANDLE: Option<u64> = None;
 
-#[skyline::hook(offset = 0x16cdb08, inline)]
+#[skyline::hook(offset = 0x16ccc58, inline)]
 unsafe fn set_online_latency(ctx: &InlineCtx) {
     if IS_LOCAL_ONLINE {
         let auto = *(*ctx.registers[19].x.as_ref() as *mut u8);
@@ -62,21 +62,21 @@ unsafe fn set_online_latency(ctx: &InlineCtx) {
     }
 }
 
-#[skyline::hook(offset = 0x22d91f4, inline)]
+#[skyline::hook(offset = 0x22d9cf0, inline)]
 unsafe fn online_melee_any_scene_create(_: &InlineCtx) {
     IS_LOCAL_ONLINE = false;
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
 
-#[skyline::hook(offset = 0x22d9124, inline)]
+#[skyline::hook(offset = 0x22d9c20, inline)]
 unsafe fn bg_matchmaking_seq(_: &InlineCtx) {
     IS_LOCAL_ONLINE = false;
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
 
-#[skyline::hook(offset = 0x23599b0, inline)]
+#[skyline::hook(offset = 0x235a630, inline)]
 unsafe fn main_menu(_: &InlineCtx) {
     IS_LOCAL_ONLINE = false;
     framerate::set_framerate_target(60);
@@ -84,14 +84,14 @@ unsafe fn main_menu(_: &InlineCtx) {
 }
 
 // called on local online menu init
-#[skyline::hook(offset = 0x1bd3ae0, inline)]
+#[skyline::hook(offset = 0x1bd45c0, inline)]
 unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
     IS_LOCAL_ONLINE = true;
     let handle = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
     LOCAL_ROOM_PANE_HANDLE = Some(handle);
 }
 
-#[skyline::hook(offset = 0x1bd6f40, inline)]
+#[skyline::hook(offset = 0x1bd7a60, inline)]
 unsafe fn update_local_menu(_: &InlineCtx) {
     if let Some(v) = LOCAL_ROOM_PANE_HANDLE {
         poll();
@@ -109,7 +109,7 @@ pub unsafe fn current_input_delay() -> &'static Delay {
 }
 
 pub unsafe fn poll() {
-    let pressed_buttons = utils::poll_buttons(vec![ninput::Buttons::LEFT, ninput::Buttons::RIGHT]);
+    let pressed_buttons = utils::poll_buttons(&[ninput::Buttons::LEFT, ninput::Buttons::RIGHT]);
     match pressed_buttons {
         ninput::Buttons::LEFT => CURRENT_INPUT_DELAY.prev(),
         ninput::Buttons::RIGHT => CURRENT_INPUT_DELAY.next(),
