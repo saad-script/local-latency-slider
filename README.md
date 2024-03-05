@@ -1,13 +1,14 @@
-I took blue-dev's code for the [original arena latency slider mod](https://github.com/blu-dev/arena-latency-slider) and modified it so that it only works with local online. I also added in options to change the game's framerate to get even lower input delay. You can see the readme on the original repo to get details as to how exactly the mod changes the online latency.
+I took blue-dev's code for the original arena latency slider mod and modified it so that it only works with local online. I also added in options to change the game's framerate to get even lower input delay. You can see the [original readme](./ORIGINAL_README.md) to get details as to how exactly the mod changes the online latency.
 
 ## Installation
 
-1) Make sure you have the latest [skyline](https://github.com/skyline-dev/skyline/releases) installed on yuzu.
-2) For skyline to work with LDN, download [this](https://drive.google.com/file/d/1f_idi29L7Poxg0Cljbi4oz9ubpukmdXY/view) and replace the `subsdk9` file in
+1) Make sure you have the latest [skyline](https://github.com/skyline-dev/skyline/releases) installed on yuzu:
 ```
-%yuzu_folder%/sdmc/atmosphere/contents/01006A800016E000/exefs/subsdk9
+%yuzu_folder%/sdmc/atmosphere/contents/01006A800016E000/exefs/
+                                                          ├── subsdk9 
+                                                          └── main.npdm
 ```
-3) Download the latest `liblocal_latency_slider.nro` from the [releases](https://github.com/saad-script/local-latency-slider/releases) page.
+2) Download the latest `liblocal_latency_slider.nro` from the [releases](https://github.com/saad-script/local-latency-slider/releases) page.
 Place it in the corresponding folder. This is how it should look:
 ```
 %yuzu_folder%/sdmc/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/liblocal_latency_slider.nro
@@ -15,7 +16,7 @@ Place it in the corresponding folder. This is how it should look:
 
 ## Usage
 
-- This mod is intended for use with the [yuzu](https://yuzu-emu.org/) emulator. Some functionality like the framerate options may not work on a real switch or other emulators.
+- This mod is intended for use with the yuzu emulator. Some functionality like the framerate options may not work on a real switch or other emulators.
 - This mod will only work in local online modes. It is intended to be used with yuzu's LDN capabilities to provide an online experience that is very close to the feel of playing offline (and sometimes even identical to offline!)
 - Make sure that yuzu's speed limit is set to 100%. Make sure the previous 120 fps cheat is disabled/removed.
 - Due to a current yuzu bug, make sure to connect to LDN **after** launching smash. Otherwise yuzu will crash when loading the game.
@@ -27,7 +28,7 @@ Place it in the corresponding folder. This is how it should look:
 ## Troubleshooting & FAQ
 
 - "I can't enter the local online menu"
-  - Make sure skyline is installed to the correct location and also that you installed the LDN fix in step 2 of the installation instructions.
+  - Ensure that you have the latest skyline is installed. Previous versions had a bug that did not allow you to enter to local wireless menu.
 - "Yuzu crashes when launching the game"
   - Make sure to connect to LDN **after** launching smash. If the issue still persists you may have to delete your shaders.
 - "I set the online delay to a low value but the game still feels very slow and stuttery"
