@@ -1,3 +1,4 @@
+use skyline::nn::ui2d::Pane;
 use std::time::Instant;
 
 extern "C" {
@@ -6,7 +7,7 @@ extern "C" {
 }
 
 #[skyline::from_offset(0x37a1ef0)]
-pub fn set_text_string(pane: u64, string: *const u8);
+pub fn set_text_string(pane: *mut Pane, string: *const u8);
 
 pub fn is_yuzu_emulator() -> bool {
     unsafe {
