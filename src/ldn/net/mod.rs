@@ -2,13 +2,28 @@ mod ext;
 
 use ext::*;
 use std::net::{SocketAddr, UdpSocket};
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::utils::is_ready_go;
+
 const SEND_PORT: u16 = 3070;
 const LISTEN_PORT: u16 = 3080;
-static mut PING_AVG: AtomicI64 = AtomicI64::new(-1);
+
+static ROOM_NET_DIAGNOSTICS: Mutex<NetworkDiagnostics> = Mutex::new(NetworkDiagnostics::new());
+static PLAYER_NET_STATS: [Mutex<Option<PlayerNetInfo>>; 8] = [
+    Mutex::new(None),
+    Mutex::new(None),
+    Mutex::new(None),
+    Mutex::new(None),
+    Mutex::new(None),
+    Mutex::new(None),
+    Mutex::new(None),
+    Mutex::new(None),
+];
+
+
 
 #[skyline::hook(replace = scan_network)]
 unsafe fn on_network_scan(
@@ -35,13 +50,10 @@ unsafe fn on_network_scan(
 unsafe fn poll_listener(
     socket: &UdpSocket,
     buf: &mut [u8],
-    ping_avg: &mut AveragedPing,
 ) -> std::io::Result<()> {
     let (packet, mut src_addr) = match socket.read(buf, true) {
         Ok(p) => p,
         Err(e) => {
-            PING_AVG.store(-1, Ordering::Relaxed);
-            ping_avg.reset();
             return Err(e);
         }
     };
@@ -59,12 +71,31 @@ unsafe fn poll_listener(
         }
         NetworkPacketType::Pong => {
             let curr_ping = packet.get_time_elapsed().as_millis();
+            ROOM_NET_DIAGNOSTICS.lock().unwrap().register_ping(curr_ping as u64);
             println!("Got Pong packet {}: {}", packet.get_timestamp(), curr_ping);
-            ping_avg.register(curr_ping as u64);
-            match ping_avg.get() {
-                Some(p) => PING_AVG.store(p as i64, Ordering::Relaxed),
-                None => PING_AVG.store(-1, Ordering::Relaxed),
+            
+
+            let network_info = try_get_network_info()?;
+            // Check which player sent the packet and update the ping
+            let (player_index, _node)  = match network_info.node_info_array.iter().enumerate()
+                                                                .find(|(_i, n)| {RawIPv4Address(n.ipv4_address).to_socket_address(LISTEN_PORT) == src_addr}) {
+                Some(v) => v,
+                None => return Err(std::io::ErrorKind::NotFound.into()),
             };
+
+            let mut guard = PLAYER_NET_STATS[player_index].lock().unwrap();
+            match guard.as_mut() {
+                Some(p) => {
+                    p.delay = packet.delay;
+                    p.framerate_config = packet.framerate_config;
+                    p.net_diagnostics.register_ping(curr_ping as u64);
+                },
+                None => *guard = Some(PlayerNetInfo {
+                    delay: packet.delay,
+                    framerate_config: packet.framerate_config,
+                    net_diagnostics: NetworkDiagnostics::new(),
+                }),
+            }
         }
     }
 
@@ -80,15 +111,16 @@ unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<
         }
     };
     let mut sent = false;
-    for i in 0..network_info.node_info_array.len() {
-        if network_info.node_info_array[i].is_connected == 0 {
+    for (i, node) in network_info.node_info_array.iter().enumerate() {
+        if node.is_connected == 0 {
+            let mut guard = PLAYER_NET_STATS[i].lock().unwrap();
+            *guard = None;
             continue;
         }
-        let ping_addr = RawIPv4Address(network_info.node_info_array[i].ipv4_address)
-            .to_socket_address(LISTEN_PORT);
-        // if ping_addr.ip() == addr.ip() {
-        //     continue;
-        // }
+        let ping_addr = RawIPv4Address(node.ipv4_address).to_socket_address(LISTEN_PORT);
+        if ping_addr.ip() == addr.ip() {
+            continue;
+        }
         let packet = NetworkPacket::create_ping_packet();
         if let Err(e) = socket.write(&ping_addr, packet) {
             println!("Error sending ping packet to {}: {}", ping_addr, e);
@@ -98,7 +130,10 @@ unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<
     }
     match sent {
         true => Ok(()),
-        false => Err(std::io::ErrorKind::NotConnected.into()),
+        false =>  {
+            ROOM_NET_DIAGNOSTICS.lock().unwrap().reset();
+            Err(std::io::ErrorKind::NotConnected.into())
+        }
     }
 }
 
@@ -110,20 +145,22 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
     let addr = get_network_address(port);
     let socket = UdpSocket::bind(addr).expect("Unable to bind to socket");
     let mut buf = [0; 1024];
-    let mut ping_avg = AveragedPing::new();
     while get_network_role() == network_role {
         let poll_start_timestamp = Instant::now();
         let r = match thread_type {
-            NetworkThreadType::Listener => poll_listener(&socket, &mut buf, &mut ping_avg),
+            NetworkThreadType::Listener => poll_listener(&socket, &mut buf),
             NetworkThreadType::Sender => poll_sender(&addr, &socket),
         };
         if let Err(e) = r {
             println!("Error in {:?} thread: {:?}", thread_type, e);
         }
 
-        //limit the rate the sender thread sends out packets to 30 packets per second by sleeping
+        //limit the rate the sender thread sends out packets
         if thread_type == NetworkThreadType::Sender {
-            let packet_interval = Duration::from_secs_f64(1.0 / 30.0);
+            let packet_interval = match is_ready_go() {
+                true => Duration::from_secs_f64(0.5),
+                false => Duration::from_secs_f64(0.1), 
+            };
             if poll_start_timestamp.elapsed() < packet_interval {
                 thread::sleep(packet_interval - poll_start_timestamp.elapsed());
             }
@@ -132,13 +169,14 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
 }
 
 unsafe fn spawn_network_threads(network_role: NetworkRole) {
+    let network_role_clone = network_role.clone();
     thread::spawn(move || {
         skyline::nn::os::ChangeThreadPriority(skyline::nn::os::GetCurrentThread(), 5);
         network_loop(network_role, NetworkThreadType::Listener);
     });
     thread::spawn(move || {
         skyline::nn::os::ChangeThreadPriority(skyline::nn::os::GetCurrentThread(), 5);
-        network_loop(network_role, NetworkThreadType::Sender);
+        network_loop(network_role_clone, NetworkThreadType::Sender);
     });
 }
 
@@ -180,15 +218,12 @@ unsafe fn on_network_destroyed() {
     println!("Network Destroyed");
 }
 
-pub fn get_ping() -> Option<u64> {
-    let ping: i64;
-    unsafe {
-        ping = PING_AVG.load(Ordering::Relaxed);
-    }
-    match ping < 0 {
-        true => None,
-        _ => Some(ping as u64),
-    }
+pub fn get_player_net_info<'a>(player_index: usize) -> std::sync::MutexGuard<'a, Option<PlayerNetInfo>> {
+    PLAYER_NET_STATS[player_index].lock().unwrap()
+}
+
+pub fn get_room_net_diag<'a>() -> std::sync::MutexGuard<'a, NetworkDiagnostics> {
+    ROOM_NET_DIAGNOSTICS.lock().unwrap()
 }
 
 pub(super) fn install() {

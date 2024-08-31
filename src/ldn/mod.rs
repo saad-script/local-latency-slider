@@ -2,7 +2,7 @@ pub mod latency_slider;
 pub mod net;
 
 use crate::framerate;
-use crate::utils;
+use crate::utils::TextBoxExt;
 use skyline::hooks::InlineCtx;
 use skyline::nn::ui2d::Pane;
 
@@ -38,10 +38,10 @@ unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
 
 #[skyline::hook(offset = 0x1bd7a60, inline)]
 unsafe fn update_local_menu(_: &InlineCtx) {
-    if let Some(v) = LOCAL_ROOM_PANE_HANDLE {
+    if let Some(p) = LOCAL_ROOM_PANE_HANDLE {
         latency_slider::poll();
         let delay_str = latency_slider::current_input_delay().to_string();
-        utils::set_text_string(v, format!("{}\0", delay_str).as_ptr());
+        (*p).as_textbox().set_text_string(&format!("{}", delay_str));
     }
 }
 

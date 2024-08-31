@@ -1,10 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
     time::Duration,
 };
 
-use crate::utils;
+use crate::{utils, ldn::latency_slider::{Delay, self}, framerate::{self, FramerateConfig}};
 
 extern "C" {
     #[link_name = "\u{1}_ZN2nn3ldn14GetNetworkInfoEPNS0_11NetworkInfoE"]
@@ -64,7 +63,7 @@ pub fn get_network_address(port: u16) -> SocketAddr {
     let subnet_buffer = [0; 4].as_mut_ptr() as *mut RawIPv4Address;
     unsafe {
         get_ipv4_address(ip_buffer, subnet_buffer);
-        let ip = (*ip_buffer).clone().to_socket_address(port);
+        let ip = (*ip_buffer).to_socket_address(port);
         return ip;
     }
 }
@@ -82,7 +81,7 @@ impl RawIPv4Address {
     }
 }
 
-pub fn try_get_network_info() -> std::io::Result<NetworkInfo> {
+pub fn try_get_network_info() -> std::io::Result<Box<NetworkInfo>> {
     unsafe {
         let state = get_network_state();
         match state {
@@ -91,8 +90,7 @@ pub fn try_get_network_info() -> std::io::Result<NetworkInfo> {
                 let network_info_buffer = network_info_buffer.as_mut_ptr() as *mut NetworkInfo;
 
                 get_network_info(network_info_buffer);
-                let network_info = (*network_info_buffer).clone();
-                Ok(network_info)
+                Ok(Box::from_raw(network_info_buffer))
             }
             _ => Err(std::io::ErrorKind::NotConnected.into()),
         }
@@ -164,29 +162,31 @@ pub enum NetworkState {
     Error = 6,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetworkRole {
     None,
     Host,
     Client,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetworkThreadType {
     Listener,
     Sender,
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetworkPacketType {
     Ping = 0,
     Pong = 1,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct NetworkPacket {
     pub packet_type: NetworkPacketType,
+    pub delay: Delay,
+    pub framerate_config: FramerateConfig,
     timestamp: u64,
 }
 
@@ -202,6 +202,8 @@ impl NetworkPacket {
         }
         NetworkPacket {
             packet_type: NetworkPacketType::Ping,
+            delay: latency_slider::current_input_delay(),
+            framerate_config: framerate::get_framerate_config(),
             timestamp,
         }
     }
@@ -209,6 +211,8 @@ impl NetworkPacket {
     pub unsafe fn create_pong_packet(packet: &NetworkPacket) -> Self {
         NetworkPacket {
             packet_type: NetworkPacketType::Pong,
+            delay: latency_slider::current_input_delay(),
+            framerate_config: framerate::get_framerate_config(),
             timestamp: packet.timestamp,
         }
     }
@@ -234,20 +238,22 @@ impl NetworkPacket {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        unsafe { (*(bytes[..core::mem::size_of::<Self>()].as_ptr() as *const Self)).clone() }
+        unsafe {
+            std::ptr::read(bytes.as_ptr() as *const Self)
+        }
     }
 }
 
-pub struct AveragedPing {
+pub struct NetworkDiagnostics {
     pings: [u64; 100],
     counter: usize,
     sum: u64,
     filled: bool,
 }
 
-impl AveragedPing {
-    pub fn new() -> Self {
-        AveragedPing {
+impl NetworkDiagnostics {
+    pub const fn new() -> Self {
+        NetworkDiagnostics {
             pings: [0; 100],
             counter: 0,
             sum: 0,
@@ -255,7 +261,7 @@ impl AveragedPing {
         }
     }
 
-    pub fn register(&mut self, ping: u64) {
+    pub fn register_ping(&mut self, ping: u64) {
         self.sum -= self.pings[self.counter];
         self.sum += ping;
         self.pings[self.counter] = ping;
@@ -265,7 +271,7 @@ impl AveragedPing {
         }
     }
 
-    pub fn get(&self) -> Option<u64> {
+    pub fn get_avg_ping(&self) -> Option<u64> {
         match (self.filled, self.counter == 0) {
             (true, _) => Some(self.sum / 100),
             (false, false) => Some(self.sum / self.counter as u64),
@@ -273,10 +279,40 @@ impl AveragedPing {
         }
     }
 
+    pub fn is_network_stable(&self, deviation_threshold: f64) -> bool {
+        let avg = match self.get_avg_ping() {
+            Some(a) => a,
+            None => { return true; }
+        };
+
+        let mut var_sum: u64 = 0;
+        let end = if self.filled {
+            self.counter + 1
+        } else {
+            100
+        };
+        for i in 0..end {
+            var_sum = (self.pings[i] - avg) * (self.pings[i] - avg)
+        }
+
+        let variance = if self.filled {
+            var_sum as f64 / 99.0
+        } else {
+            var_sum as f64 / self.counter as f64
+        };
+        variance <= deviation_threshold * deviation_threshold
+    }
+
     pub fn reset(&mut self) {
         self.filled = false;
         self.counter = 0;
     }
+}
+
+pub struct PlayerNetInfo {
+    pub delay: Delay,
+    pub framerate_config: FramerateConfig,
+    pub net_diagnostics: NetworkDiagnostics,
 }
 
 pub trait UdpSocketExt {
@@ -302,18 +338,10 @@ impl UdpSocketExt for UdpSocket {
             }
         };
 
-        // match bincode::deserialize(&buf[0..num_bytes]) {
-        //     Ok(p) => Ok((p, src_addr)),
-        //     Err(_e) => Err(std::io::ErrorKind::InvalidData.into()),
-        // }
         Ok((NetworkPacket::from_bytes(&buf[0..num_bytes]), src_addr))
     }
 
     fn write(&self, addr: &SocketAddr, packet: NetworkPacket) -> std::io::Result<usize> {
-        // match bincode::serialize(&packet) {
-        //     Ok(p) => self.send_to(&p, addr),
-        //     Err(_e) => Err(std::io::ErrorKind::InvalidData.into()),
-        // }
         self.send_to(packet.to_bytes(), addr)
     }
 }

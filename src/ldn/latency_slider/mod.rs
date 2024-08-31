@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use skyline::hooks::InlineCtx;
 
 use crate::ldn;
@@ -5,13 +7,13 @@ use crate::utils;
 
 const MAX_INPUT_BUFFER: u8 = 25;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Delay {
     buffer: Buffer,
     last_auto: Option<u8>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Buffer {
     Auto,
     Override(u8),
@@ -44,39 +46,37 @@ impl Delay {
     }
 }
 
-static mut CURRENT_INPUT_DELAY: Delay = Delay {
+static CURRENT_INPUT_DELAY: Mutex<Delay> = Mutex::new(
+    Delay {
     buffer: Buffer::Override(4),
     last_auto: None,
-};
+});
 
 #[skyline::hook(offset = 0x16ccc58, inline)]
 unsafe fn set_online_latency(ctx: &InlineCtx) {
     if ldn::is_local_online() {
         let auto = *(*ctx.registers[19].x.as_ref() as *mut u8);
-        CURRENT_INPUT_DELAY.last_auto = Some(auto);
-        if let Buffer::Override(v) = CURRENT_INPUT_DELAY.buffer {
+        let mut delay = CURRENT_INPUT_DELAY.lock().unwrap();
+        delay.last_auto = Some(auto);
+        if let Buffer::Override(v) = delay.buffer {
             *(*ctx.registers[19].x.as_ref() as *mut u8) = v;
         }
     }
 }
 
-pub fn current_input_delay() -> &'static Delay {
-    unsafe {
-        return &CURRENT_INPUT_DELAY;
-    }
+pub fn current_input_delay() -> Delay {
+    CURRENT_INPUT_DELAY.lock().unwrap().clone()
 }
 
 pub fn poll() {
     let pressed_buttons = utils::poll_buttons(&[ninput::Buttons::LEFT, ninput::Buttons::RIGHT]);
-    unsafe {
-        match pressed_buttons {
-            ninput::Buttons::LEFT => CURRENT_INPUT_DELAY.prev(),
-            ninput::Buttons::RIGHT => CURRENT_INPUT_DELAY.next(),
-            _ => (),
-        }
+    match pressed_buttons {
+        ninput::Buttons::LEFT => CURRENT_INPUT_DELAY.lock().unwrap().prev(),
+        ninput::Buttons::RIGHT => CURRENT_INPUT_DELAY.lock().unwrap().next(),
+        _ => (),
     }
 }
 
 pub(super) fn install() {
-    skyline::install_hooks!(set_online_latency,);
+    skyline::install_hook!(set_online_latency);
 }
