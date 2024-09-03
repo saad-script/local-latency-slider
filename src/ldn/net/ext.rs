@@ -1,9 +1,9 @@
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
-    time::Duration,
-};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::time::Duration;
 
-use crate::{utils, ldn::latency_slider::{Delay, self}, framerate::{self, FramerateConfig}};
+use crate::framerate::{self, FramerateConfig};
+use crate::ldn::latency_slider::{self, Delay};
+use crate::utils;
 
 extern "C" {
     #[link_name = "\u{1}_ZN2nn3ldn14GetNetworkInfoEPNS0_11NetworkInfoE"]
@@ -92,7 +92,10 @@ pub fn try_get_network_info() -> std::io::Result<Box<NetworkInfo>> {
                 get_network_info(network_info_buffer);
                 Ok(Box::from_raw(network_info_buffer))
             }
-            _ => Err(std::io::Error::new(std::io::ErrorKind::NotConnected, "Unable to get network info")),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "Unable to get network info",
+            )),
         }
     }
 }
@@ -202,8 +205,8 @@ impl NetworkPacket {
         }
         NetworkPacket {
             packet_type: NetworkPacketType::Ping,
-            delay: latency_slider::current_input_delay(),
-            framerate_config: framerate::get_framerate_config(),
+            delay: latency_slider::current_input_delay().clone(),
+            framerate_config: framerate::get_framerate_config().clone(),
             timestamp,
         }
     }
@@ -211,8 +214,8 @@ impl NetworkPacket {
     pub unsafe fn create_pong_packet(packet: &NetworkPacket) -> Self {
         NetworkPacket {
             packet_type: NetworkPacketType::Pong,
-            delay: latency_slider::current_input_delay(),
-            framerate_config: framerate::get_framerate_config(),
+            delay: latency_slider::current_input_delay().clone(),
+            framerate_config: framerate::get_framerate_config().clone(),
             timestamp: packet.timestamp,
         }
     }
@@ -238,9 +241,7 @@ impl NetworkPacket {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        unsafe {
-            std::ptr::read(bytes.as_ptr() as *const Self)
-        }
+        unsafe { std::ptr::read(bytes.as_ptr() as *const Self) }
     }
 }
 
@@ -282,15 +283,13 @@ impl NetworkDiagnostics {
     pub fn is_network_stable(&self, deviation_threshold: f64) -> bool {
         let avg = match self.get_avg_ping() {
             Some(a) => a,
-            None => { return true; }
+            None => {
+                return true;
+            }
         };
 
         let mut var_sum: u64 = 0;
-        let end = if self.filled {
-            self.counter + 1
-        } else {
-            100
-        };
+        let end = if self.filled { self.counter + 1 } else { 100 };
         for i in 0..end {
             var_sum = (self.pings[i] - avg) * (self.pings[i] - avg)
         }

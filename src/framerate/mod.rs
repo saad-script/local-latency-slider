@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use crate::ldn;
 use crate::utils;
@@ -8,34 +8,46 @@ const DEFAULT_TARGET_FRAMERATE: u32 = 60;
 const MAX_TARGET_FRAMERATE: u32 = 240;
 const TARGET_FRAMERATE_INC: u32 = 60;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FramerateConfig {
-    target_framerate: u32,
-    is_vsync_enabled: bool,
+    target_framerate: AtomicU32,
+    is_vsync_enabled: AtomicBool,
 }
 
-impl FramerateConfig {
-    pub fn to_string(&self) -> String {
-        let vsync_indicator = match self.is_vsync_enabled {
-            true => "",
-            false => "++",
-        };
-        format!("{} FPS{}", self.target_framerate, vsync_indicator)
+impl Clone for FramerateConfig {
+    fn clone(&self) -> Self {
+        FramerateConfig {
+            target_framerate: AtomicU32::new(self.target_framerate.load(Ordering::SeqCst)),
+            is_vsync_enabled: AtomicBool::new(self.is_vsync_enabled.load(Ordering::SeqCst)),
+        }
     }
 }
 
-static FRAMERATE_CONFIG: Mutex<FramerateConfig> = Mutex::new(FramerateConfig {
-    target_framerate: 60,
-    is_vsync_enabled: true,
-});
+impl ToString for FramerateConfig {
+    fn to_string(&self) -> String {
+        let vsync_indicator = match self.is_vsync_enabled.load(Ordering::SeqCst) {
+            true => "",
+            false => "++",
+        };
+        format!(
+            "{} FPS{}",
+            self.target_framerate.load(Ordering::SeqCst),
+            vsync_indicator
+        )
+    }
+}
+
+static FRAMERATE_CONFIG: FramerateConfig = FramerateConfig {
+    target_framerate: AtomicU32::new(60),
+    is_vsync_enabled: AtomicBool::new(true),
+};
 
 #[skyline::hook(offset = 0x135caf8, inline)]
 unsafe fn on_game_speed_calc(_: &InlineCtx) {
     if !ldn::is_local_online() {
         return;
     }
-    let target_framerate = FRAMERATE_CONFIG.lock().unwrap().target_framerate;
-    set_internal_framerate(3600 / target_framerate);
+    set_internal_framerate(3600 / FRAMERATE_CONFIG.target_framerate.load(Ordering::SeqCst));
 }
 
 #[skyline::hook(offset = 0x374777c, inline)]
@@ -44,10 +56,8 @@ unsafe fn scene_update(_: &InlineCtx) {
     if !ldn::is_local_online() {
         return;
     }
-    let guard = FRAMERATE_CONFIG.lock().unwrap();
-    let target_framerate = guard.target_framerate;
-    let vsync_enabled = guard.is_vsync_enabled;
-    drop(guard);
+    let target_framerate = FRAMERATE_CONFIG.target_framerate.load(Ordering::SeqCst);
+    let vsync_enabled = FRAMERATE_CONFIG.is_vsync_enabled.load(Ordering::SeqCst);
     set_framerate_target(target_framerate);
     set_vsync_enabled(vsync_enabled);
     if vsync_enabled {
@@ -79,20 +89,21 @@ unsafe fn set_internal_framerate(internal_framerate: u32) {
     *(internal_frame_rate_addr as *mut u32) = internal_framerate
 }
 
-pub fn set_framerate_target(framerate_target: u32) {
+pub fn set_framerate_target(target_framerate: u32) {
     unsafe {
-        let mut guard = FRAMERATE_CONFIG.lock().unwrap();
-        guard.target_framerate = framerate_target;
-        set_internal_framerate(3600 / guard.target_framerate);
+        FRAMERATE_CONFIG
+            .target_framerate
+            .store(target_framerate, Ordering::SeqCst);
+        set_internal_framerate(3600 / target_framerate);
     }
 }
 
-pub fn set_vsync_enabled(enabled: bool) {
+pub fn set_vsync_enabled(vsync_enabled: bool) {
     unsafe {
-        let mut guard = FRAMERATE_CONFIG.lock().unwrap();
-        guard.is_vsync_enabled = enabled;
-        let target_framerate = guard.target_framerate;
-        let vsync_enabled = guard.is_vsync_enabled;
+        let target_framerate = FRAMERATE_CONFIG.target_framerate.load(Ordering::SeqCst);
+        FRAMERATE_CONFIG
+            .is_vsync_enabled
+            .store(vsync_enabled, Ordering::SeqCst);
         match (vsync_enabled, target_framerate == 60) {
             (true, false) => set_swap_interval(((target_framerate as f64 / 60.0) * 100.0) as i32),
             (false, _) => set_swap_interval(10000),
@@ -101,8 +112,8 @@ pub fn set_vsync_enabled(enabled: bool) {
     }
 }
 
-pub fn get_framerate_config() -> FramerateConfig {
-    FRAMERATE_CONFIG.lock().unwrap().clone()
+pub fn get_framerate_config() -> &'static FramerateConfig {
+    &FRAMERATE_CONFIG
 }
 
 pub fn poll() {
@@ -111,26 +122,33 @@ pub fn poll() {
         ninput::Buttons::DOWN,
         ninput::Buttons::X,
     ]);
-    let mut guard = FRAMERATE_CONFIG.lock().unwrap();
+    let mut target_framerate = FRAMERATE_CONFIG.target_framerate.load(Ordering::SeqCst);
+    let vsync_enabled = FRAMERATE_CONFIG.is_vsync_enabled.load(Ordering::SeqCst);
     match pressed_buttons {
         ninput::Buttons::UP => {
-            if guard.is_vsync_enabled {
-                guard.target_framerate += TARGET_FRAMERATE_INC;
+            if vsync_enabled {
+                target_framerate += TARGET_FRAMERATE_INC;
             }
         }
         ninput::Buttons::DOWN => {
-            if guard.is_vsync_enabled {
-                guard.target_framerate -= TARGET_FRAMERATE_INC;
+            if vsync_enabled {
+                target_framerate -= TARGET_FRAMERATE_INC;
             }
         }
         ninput::Buttons::X => {
-            if guard.target_framerate == DEFAULT_TARGET_FRAMERATE {
-                guard.is_vsync_enabled = !guard.is_vsync_enabled;
+            if target_framerate == DEFAULT_TARGET_FRAMERATE {
+                FRAMERATE_CONFIG
+                    .is_vsync_enabled
+                    .store(!vsync_enabled, Ordering::SeqCst);
             }
         }
         _ => (),
     }
-    guard.target_framerate = guard.target_framerate.clamp(DEFAULT_TARGET_FRAMERATE, MAX_TARGET_FRAMERATE);
+    let new_target_framerate =
+        target_framerate.clamp(DEFAULT_TARGET_FRAMERATE, MAX_TARGET_FRAMERATE);
+    FRAMERATE_CONFIG
+        .target_framerate
+        .store(new_target_framerate, Ordering::SeqCst);
 }
 
 pub fn install() {

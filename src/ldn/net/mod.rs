@@ -23,8 +23,6 @@ static PLAYER_NET_STATS: [Mutex<Option<PlayerNetInfo>>; 8] = [
     Mutex::new(None),
 ];
 
-
-
 #[skyline::hook(replace = scan_network)]
 unsafe fn on_network_scan(
     network_info: *mut NetworkInfo,
@@ -47,10 +45,7 @@ unsafe fn on_network_scan(
     );
 }
 
-unsafe fn poll_listener(
-    socket: &UdpSocket,
-    buf: &mut [u8],
-) -> std::io::Result<()> {
+unsafe fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<()> {
     let (packet, mut src_addr) = match socket.read(buf, true) {
         Ok(p) => p,
         Err(e) => {
@@ -71,17 +66,30 @@ unsafe fn poll_listener(
         }
         NetworkPacketType::Pong => {
             let curr_ping = packet.get_time_elapsed().as_millis();
-            ROOM_NET_DIAGNOSTICS.lock().unwrap().register_ping(curr_ping as u64);
+            ROOM_NET_DIAGNOSTICS
+                .lock()
+                .unwrap()
+                .register_ping(curr_ping as u64);
             println!("Got Pong packet {}: {}", packet.get_timestamp(), curr_ping);
-            
 
             let network_info = try_get_network_info()?;
             // Check which player sent the packet and update the ping
-            let (player_index, _node)  = match network_info.node_info_array.iter().enumerate()
-                                                                .find(|(_i, n)| {RawIPv4Address(n.ipv4_address).to_socket_address(LISTEN_PORT) == src_addr}) {
-                Some(v) => v,
-                None => return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Unable to identify sender address")),
-            };
+            let (player_index, _node) =
+                match network_info
+                    .node_info_array
+                    .iter()
+                    .enumerate()
+                    .find(|(_i, n)| {
+                        RawIPv4Address(n.ipv4_address).to_socket_address(LISTEN_PORT) == src_addr
+                    }) {
+                    Some(v) => v,
+                    None => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "Unable to identify sender address",
+                        ))
+                    }
+                };
 
             let mut guard = PLAYER_NET_STATS[player_index].lock().unwrap();
             match guard.as_mut() {
@@ -89,12 +97,14 @@ unsafe fn poll_listener(
                     p.delay = packet.delay;
                     p.framerate_config = packet.framerate_config;
                     p.net_diagnostics.register_ping(curr_ping as u64);
-                },
-                None => *guard = Some(PlayerNetInfo {
-                    delay: packet.delay,
-                    framerate_config: packet.framerate_config,
-                    net_diagnostics: NetworkDiagnostics::new(),
-                }),
+                }
+                None => {
+                    *guard = Some(PlayerNetInfo {
+                        delay: packet.delay,
+                        framerate_config: packet.framerate_config,
+                        net_diagnostics: NetworkDiagnostics::new(),
+                    })
+                }
             }
         }
     }
@@ -124,9 +134,12 @@ unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<
     }
     match sent {
         true => Ok(()),
-        false =>  {
+        false => {
             ROOM_NET_DIAGNOSTICS.lock().unwrap().reset();
-            Err(std::io::Error::new(std::io::ErrorKind::NotConnected, "No network nodes found"))
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "No network nodes found",
+            ))
         }
     }
 }
@@ -153,14 +166,18 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
         if thread_type == NetworkThreadType::Sender {
             let packet_interval = match is_ready_go() {
                 true => Duration::from_secs_f64(0.5),
-                false => Duration::from_secs_f64(0.1), 
+                false => Duration::from_secs_f64(0.1),
             };
             if poll_start_timestamp.elapsed() < packet_interval {
                 thread::sleep(packet_interval - poll_start_timestamp.elapsed());
             }
         }
     }
-    println!("{:?} Network loop exited, with Network State: {:?}", thread_type, get_network_state());
+    println!(
+        "{:?} Network loop exited, with Network State: {:?}",
+        thread_type,
+        get_network_state()
+    );
     for player_net_stat in PLAYER_NET_STATS.iter() {
         let mut guard = player_net_stat.lock().unwrap();
         *guard = None;
@@ -217,7 +234,9 @@ unsafe fn on_network_destroyed() {
     println!("Network Destroyed");
 }
 
-pub fn get_player_net_info<'a>(player_index: usize) -> std::sync::MutexGuard<'a, Option<PlayerNetInfo>> {
+pub fn get_player_net_info<'a>(
+    player_index: usize,
+) -> std::sync::MutexGuard<'a, Option<PlayerNetInfo>> {
     PLAYER_NET_STATS[player_index].lock().unwrap()
 }
 

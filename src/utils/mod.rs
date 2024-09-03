@@ -11,12 +11,6 @@ extern "C" {
     pub fn is_ready_go() -> bool;
 }
 
-#[skyline::from_offset(0x37a1ef0)]
-fn set_text_string(pane: *mut Pane, string: *const u8);
-
-#[skyline::from_offset(0x59970)]
-fn find_pane_by_name_recursive(pane: *const Pane, s: *const u8) -> *mut Pane;
-
 pub fn is_yuzu_emulator() -> bool {
     unsafe {
         let base_address = skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as u64;
@@ -46,6 +40,11 @@ pub fn poll_buttons(buttons: &[ninput::Buttons]) -> ninput::Buttons {
     return ninput::Buttons::empty();
 }
 
+#[skyline::from_offset(0x37a1ef0)]
+fn set_text_string(pane: *mut Pane, string: *const u8);
+
+#[skyline::from_offset(0x59970)]
+fn find_pane_by_name_recursive(pane: *const Pane, s: *const u8) -> *mut Pane;
 
 pub trait PaneExt {
     fn next(&self) -> Option<&mut Pane>;
@@ -62,7 +61,9 @@ impl PaneExt for Pane {
         unsafe {
             let node = self.link.next;
             let pane = ((node as *mut u64).sub(1)) as *mut Pane;
-            match pane.is_null() || ((*pane).children_list.next.is_null() && (*pane).children_list.prev.is_null()) {
+            match pane.is_null()
+                || ((*pane).children_list.next.is_null() && (*pane).children_list.prev.is_null())
+            {
                 true => None,
                 false => Some(&mut *pane),
             }
@@ -73,7 +74,9 @@ impl PaneExt for Pane {
         unsafe {
             let node = self.link.prev;
             let pane = ((node as *mut u64).sub(1)) as *mut Pane;
-            match pane.is_null() || ((*pane).children_list.next.is_null() && (*pane).children_list.prev.is_null()) {
+            match pane.is_null()
+                || ((*pane).children_list.next.is_null() && (*pane).children_list.prev.is_null())
+            {
                 true => None,
                 false => Some(&mut *pane),
             }
@@ -94,7 +97,9 @@ impl PaneExt for Pane {
         unsafe {
             let node = self.children_list.next;
             let pane = ((node as *mut u64).sub(1)) as *mut Pane;
-            match pane.is_null() || ((*pane).children_list.next.is_null() && (*pane).children_list.prev.is_null()) {
+            match pane.is_null()
+                || ((*pane).children_list.next.is_null() && (*pane).children_list.prev.is_null())
+            {
                 true => None,
                 false => Some(&mut *pane),
             }
@@ -129,7 +134,9 @@ impl PaneExt for Pane {
 
     fn get_child(&self, name: &str, recursive: bool) -> Option<&mut Pane> {
         if recursive {
-            let child = unsafe { find_pane_by_name_recursive(self as *const Pane, format!("{}\0", name).as_ptr()) };
+            let child = unsafe {
+                find_pane_by_name_recursive(self as *const Pane, format!("{}\0", name).as_ptr())
+            };
             match child.is_null() {
                 true => return None,
                 false => return unsafe { Some(&mut *child) },
@@ -145,7 +152,6 @@ impl PaneExt for Pane {
         }
         return None;
     }
-
 }
 
 pub trait TextBoxExt {
@@ -155,7 +161,10 @@ pub trait TextBoxExt {
 impl TextBoxExt for TextBox {
     fn set_text_string(&mut self, text: &str) {
         unsafe {
-            set_text_string(self as *mut TextBox as *mut Pane, format!("{}\0", text).as_ptr());
+            set_text_string(
+                self as *mut TextBox as *mut Pane,
+                format!("{}\0", text).as_ptr(),
+            );
         }
     }
 }
