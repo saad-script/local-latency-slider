@@ -92,7 +92,7 @@ pub fn try_get_network_info() -> std::io::Result<Box<NetworkInfo>> {
                 get_network_info(network_info_buffer);
                 Ok(Box::from_raw(network_info_buffer))
             }
-            _ => Err(std::io::ErrorKind::NotConnected.into()),
+            _ => Err(std::io::Error::new(std::io::ErrorKind::NotConnected, "Unable to get network info")),
         }
     }
 }

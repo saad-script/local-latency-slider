@@ -80,7 +80,7 @@ unsafe fn poll_listener(
             let (player_index, _node)  = match network_info.node_info_array.iter().enumerate()
                                                                 .find(|(_i, n)| {RawIPv4Address(n.ipv4_address).to_socket_address(LISTEN_PORT) == src_addr}) {
                 Some(v) => v,
-                None => return Err(std::io::ErrorKind::NotFound.into()),
+                None => return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Unable to identify sender address")),
             };
 
             let mut guard = PLAYER_NET_STATS[player_index].lock().unwrap();
@@ -103,13 +103,7 @@ unsafe fn poll_listener(
 }
 
 unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<()> {
-    let network_info = match try_get_network_info() {
-        Ok(n) => n,
-        Err(e) => {
-            println!("Unable to get network info: {}", e);
-            return Err(e);
-        }
-    };
+    let network_info = try_get_network_info()?;
     let mut sent = false;
     for (i, node) in network_info.node_info_array.iter().enumerate() {
         if node.is_connected == 0 {
@@ -123,7 +117,7 @@ unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<
         }
         let packet = NetworkPacket::create_ping_packet();
         if let Err(e) = socket.write(&ping_addr, packet) {
-            println!("Error sending ping packet to {}: {}", ping_addr, e);
+            eprintln!("Error sending ping packet to {}: {}", ping_addr, e);
             continue;
         }
         sent = true;
@@ -132,7 +126,7 @@ unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<
         true => Ok(()),
         false =>  {
             ROOM_NET_DIAGNOSTICS.lock().unwrap().reset();
-            Err(std::io::ErrorKind::NotConnected.into())
+            Err(std::io::Error::new(std::io::ErrorKind::NotConnected, "No network nodes found"))
         }
     }
 }
@@ -152,7 +146,7 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
             NetworkThreadType::Sender => poll_sender(&addr, &socket),
         };
         if let Err(e) = r {
-            println!("Error in {:?} thread: {:?}", thread_type, e);
+            eprintln!("Error in {:?} thread: {:?}", thread_type, e);
         }
 
         //limit the rate the sender thread sends out packets
@@ -165,6 +159,11 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
                 thread::sleep(packet_interval - poll_start_timestamp.elapsed());
             }
         }
+    }
+    println!("{:?} Network loop exited, with Network State: {:?}", thread_type, get_network_state());
+    for player_net_stat in PLAYER_NET_STATS.iter() {
+        let mut guard = player_net_stat.lock().unwrap();
+        *guard = None;
     }
 }
 
