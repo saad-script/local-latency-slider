@@ -12,15 +12,15 @@ const SEND_PORT: u16 = 3070;
 const LISTEN_PORT: u16 = 3080;
 
 static ROOM_NET_DIAGNOSTICS: Mutex<NetworkDiagnostics> = Mutex::new(NetworkDiagnostics::new());
-static PLAYER_NET_STATS: [Mutex<Option<PlayerNetInfo>>; 8] = [
-    Mutex::new(None),
-    Mutex::new(None),
-    Mutex::new(None),
-    Mutex::new(None),
-    Mutex::new(None),
-    Mutex::new(None),
-    Mutex::new(None),
-    Mutex::new(None),
+static PLAYER_NET_STATS: [PlayerNetInfo; 8] = [
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
+    PlayerNetInfo::default(),
 ];
 
 #[skyline::hook(replace = scan_network)]
@@ -45,7 +45,7 @@ unsafe fn on_network_scan(
     );
 }
 
-unsafe fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<()> {
+fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<()> {
     let (packet, mut src_addr) = match socket.read(buf, true) {
         Ok(p) => p,
         Err(e) => {
@@ -91,34 +91,23 @@ unsafe fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<(
                     }
                 };
 
-            let mut guard = PLAYER_NET_STATS[player_index].lock().unwrap();
-            match guard.as_mut() {
-                Some(p) => {
-                    p.delay = packet.delay;
-                    p.framerate_config = packet.framerate_config;
-                    p.net_diagnostics.register_ping(curr_ping as u64);
-                }
-                None => {
-                    *guard = Some(PlayerNetInfo {
-                        delay: packet.delay,
-                        framerate_config: packet.framerate_config,
-                        net_diagnostics: NetworkDiagnostics::new(),
-                    })
-                }
-            }
+            let player_net_info = &PLAYER_NET_STATS[player_index];
+            player_net_info.set_connected(true);
+            player_net_info.delay.load_from(&packet.delay);
+            player_net_info.framerate_config.load_from(&packet.framerate_config);
+            player_net_info.net_diagnostics.lock().unwrap().register_ping(curr_ping as u64);
         }
     }
 
     Ok(())
 }
 
-unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<()> {
+fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<()> {
     let network_info = try_get_network_info()?;
     let mut sent = false;
     for (i, node) in network_info.node_info_array.iter().enumerate() {
         if node.is_connected == 0 {
-            let mut guard = PLAYER_NET_STATS[i].lock().unwrap();
-            *guard = None;
+            PLAYER_NET_STATS[i].set_connected(false);
             continue;
         }
         let ping_addr = RawIPv4Address(node.ipv4_address).to_socket_address(LISTEN_PORT);
@@ -144,7 +133,7 @@ unsafe fn poll_sender(addr: &SocketAddr, socket: &UdpSocket) -> std::io::Result<
     }
 }
 
-unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType) {
+fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType) {
     let port = match thread_type {
         NetworkThreadType::Listener => LISTEN_PORT,
         NetworkThreadType::Sender => SEND_PORT,
@@ -152,6 +141,7 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
     let addr = get_network_address(port);
     let socket = UdpSocket::bind(addr).expect("Unable to bind to socket");
     let mut buf = [0; 1024];
+    let packet_interval = Duration::from_secs_f64(0.1);
     while get_network_role() == network_role {
         let poll_start_timestamp = Instant::now();
         let r = match thread_type {
@@ -164,23 +154,13 @@ unsafe fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType
 
         //limit the rate the sender thread sends out packets
         if thread_type == NetworkThreadType::Sender {
-            let packet_interval = match is_ready_go() {
-                true => Duration::from_secs_f64(0.5),
-                false => Duration::from_secs_f64(0.1),
-            };
             if poll_start_timestamp.elapsed() < packet_interval {
                 thread::sleep(packet_interval - poll_start_timestamp.elapsed());
             }
         }
     }
-    println!(
-        "{:?} Network loop exited, with Network State: {:?}",
-        thread_type,
-        get_network_state()
-    );
     for player_net_stat in PLAYER_NET_STATS.iter() {
-        let mut guard = player_net_stat.lock().unwrap();
-        *guard = None;
+        player_net_stat.set_connected(false);
     }
 }
 
@@ -189,10 +169,20 @@ unsafe fn spawn_network_threads(network_role: NetworkRole) {
     thread::spawn(move || {
         skyline::nn::os::ChangeThreadPriority(skyline::nn::os::GetCurrentThread(), 5);
         network_loop(network_role, NetworkThreadType::Listener);
+        println!(
+            "Listener Network loop exited, with Network State: {:?}",
+            get_network_state()
+        );
+        skyline::nn::os::ChangeThreadPriority(skyline::nn::os::GetCurrentThread(), 24);
     });
     thread::spawn(move || {
         skyline::nn::os::ChangeThreadPriority(skyline::nn::os::GetCurrentThread(), 5);
         network_loop(network_role_clone, NetworkThreadType::Sender);
+        println!(
+            "Sender Network loop exited, with Network State: {:?}",
+            get_network_state()
+        );
+        skyline::nn::os::ChangeThreadPriority(skyline::nn::os::GetCurrentThread(), 24);
     });
 }
 
@@ -236,8 +226,8 @@ unsafe fn on_network_destroyed() {
 
 pub fn get_player_net_info<'a>(
     player_index: usize,
-) -> std::sync::MutexGuard<'a, Option<PlayerNetInfo>> {
-    PLAYER_NET_STATS[player_index].lock().unwrap()
+) -> &'static PlayerNetInfo {
+    &PLAYER_NET_STATS[player_index]
 }
 
 pub fn get_room_net_diag<'a>() -> std::sync::MutexGuard<'a, NetworkDiagnostics> {

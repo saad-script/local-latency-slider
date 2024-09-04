@@ -1,4 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use crate::framerate::{self, FramerateConfig};
@@ -198,7 +200,7 @@ impl NetworkPacket {
         return self.timestamp;
     }
 
-    pub unsafe fn create_ping_packet() -> Self {
+    pub fn create_ping_packet() -> Self {
         let timestamp: u64;
         unsafe {
             timestamp = skyline::nn::os::GetSystemTick() as u64;
@@ -211,7 +213,7 @@ impl NetworkPacket {
         }
     }
 
-    pub unsafe fn create_pong_packet(packet: &NetworkPacket) -> Self {
+    pub fn create_pong_packet(packet: &NetworkPacket) -> Self {
         NetworkPacket {
             packet_type: NetworkPacketType::Pong,
             delay: latency_slider::current_input_delay().clone(),
@@ -245,6 +247,7 @@ impl NetworkPacket {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct NetworkDiagnostics {
     pings: [u64; 100],
     counter: usize,
@@ -280,11 +283,11 @@ impl NetworkDiagnostics {
         }
     }
 
-    pub fn is_network_stable(&self, deviation_threshold: f64) -> bool {
+    pub fn get_network_variance(&self) -> f64 {
         let avg = match self.get_avg_ping() {
             Some(a) => a,
             None => {
-                return true;
+                return 0.0;
             }
         };
 
@@ -299,7 +302,8 @@ impl NetworkDiagnostics {
         } else {
             var_sum as f64 / self.counter as f64
         };
-        variance <= deviation_threshold * deviation_threshold
+
+        variance
     }
 
     pub fn reset(&mut self) {
@@ -308,10 +312,35 @@ impl NetworkDiagnostics {
     }
 }
 
+#[derive(Debug)]
 pub struct PlayerNetInfo {
+    connected: AtomicBool,
     pub delay: Delay,
     pub framerate_config: FramerateConfig,
-    pub net_diagnostics: NetworkDiagnostics,
+    pub net_diagnostics: Mutex<NetworkDiagnostics>,
+}
+
+impl PlayerNetInfo {
+    pub const fn default() -> Self {
+        PlayerNetInfo {
+            connected: AtomicBool::new(false),
+            delay: Delay::default(), 
+            framerate_config: FramerateConfig::default(), 
+            net_diagnostics: Mutex::new(NetworkDiagnostics::new()),
+        }
+    }
+
+    pub fn set_connected(&self, connected: bool) {
+        if let Ok(_updated) = self.connected.compare_exchange(!connected, connected, Ordering::SeqCst, Ordering::SeqCst) {
+            if !connected {
+                self.net_diagnostics.lock().unwrap().reset();
+            }
+        }
+    }
+
+    pub fn is_connected(&self) -> bool {
+        return self.connected.load(Ordering::SeqCst)
+    }
 }
 
 pub trait UdpSocketExt {

@@ -14,6 +14,19 @@ pub struct FramerateConfig {
     is_vsync_enabled: AtomicBool,
 }
 
+impl FramerateConfig {
+    pub fn load_from(&self, framerate_config: &FramerateConfig) {
+        self.target_framerate.store(framerate_config.target_framerate.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.is_vsync_enabled.store(framerate_config.is_vsync_enabled.load(Ordering::SeqCst), Ordering::SeqCst);
+    }
+    pub const fn default() -> Self {
+        FramerateConfig { 
+            target_framerate: AtomicU32::new(60), 
+            is_vsync_enabled: AtomicBool::new(true),
+        }
+    }
+}
+
 impl Clone for FramerateConfig {
     fn clone(&self) -> Self {
         FramerateConfig {
@@ -37,10 +50,7 @@ impl ToString for FramerateConfig {
     }
 }
 
-static FRAMERATE_CONFIG: FramerateConfig = FramerateConfig {
-    target_framerate: AtomicU32::new(60),
-    is_vsync_enabled: AtomicBool::new(true),
-};
+static FRAMERATE_CONFIG: FramerateConfig = FramerateConfig::default();
 
 #[skyline::hook(offset = 0x135caf8, inline)]
 unsafe fn on_game_speed_calc(_: &InlineCtx) {

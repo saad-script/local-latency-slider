@@ -26,6 +26,16 @@ impl Delay {
         self.buffer
             .store((prev_delay - 1).max(-1), Ordering::SeqCst);
     }
+    pub fn load_from(&self, delay: &Delay) {
+        self.buffer.store(delay.buffer.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.last_auto.store(delay.last_auto.load(Ordering::SeqCst), Ordering::SeqCst);
+    }
+    pub const fn default() -> Self {
+        Delay { 
+            buffer: AtomicI8::new(4), 
+            last_auto: AtomicI8::new(-1),
+        }
+    }
 }
 
 impl Clone for Delay {
@@ -49,10 +59,7 @@ impl ToString for Delay {
     }
 }
 
-static CURRENT_INPUT_DELAY: Delay = Delay {
-    buffer: AtomicI8::new(4),
-    last_auto: AtomicI8::new(-1),
-};
+static CURRENT_INPUT_DELAY: Delay = Delay::default();
 
 #[skyline::hook(offset = 0x16ccc58, inline)]
 unsafe fn set_online_latency(ctx: &InlineCtx) {

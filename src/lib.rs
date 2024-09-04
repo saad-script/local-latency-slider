@@ -20,9 +20,13 @@ unsafe fn update_css(arg: u64) {
             None => String::from(""),
         };
         let banner_display_str = format!("Buffer: {} [{}]{}\0", delay_str, framerate_config.to_string(), ping_str);
-        let (r, g, b, a) = match room_net_diag.is_network_stable(5.0) {
-            true => (0, 255, 0, 255),
-            false => (255, 0, 0, 255),
+        let network_variance = room_net_diag.get_network_variance();
+        let (r, g, b, a) = if network_variance <= 25.0 {
+            (0, 255, 0, 255)
+        } else if network_variance <= 100.0 {
+            (255, 255, 0, 255)
+        } else {
+            (255, 0, 0, 255)
         };
         drop(room_net_diag);
 
@@ -51,19 +55,21 @@ unsafe fn update_css(arg: u64) {
             let player_panel_name = player_panel.get_child(&format!("set_btn_panel"), false).unwrap();
             let player_panel_name = player_panel_name.children().unwrap().next().unwrap();
             let player_panel_name = player_panel_name.get_child(&format!("set_txt_00"), true).unwrap();
-            match ldn::net::get_player_net_info(player_index).as_ref() {
-                Some(p) => {
+
+            let player_net_info = ldn::net::get_player_net_info(player_index);
+            match player_net_info.is_connected() {
+                true => {
                     if ninput::any::is_press(ninput::Buttons::STICK_R) {
-                        let avg_ping = match p.net_diagnostics.get_avg_ping() {
+                        let avg_ping = match player_net_info.net_diagnostics.lock().unwrap().get_avg_ping() {
                             Some(p) => format!("{}ms", p),
                             None => String::from("???"),
                         };
                         player_panel_name.as_textbox().set_text_string(&format!("{}", avg_ping));
                     } else {
-                        player_panel_name.as_textbox().set_text_string(&format!("{}, {}", p.framerate_config.to_string(), p.delay.to_string()));
+                        player_panel_name.as_textbox().set_text_string(&format!("{}, {}", player_net_info.framerate_config.to_string(), player_net_info.delay.to_string()));
                     }
                 } 
-                None => {
+                false => {
                     player_panel_name.as_textbox().set_text_string(&format!("P{}", player_index + 1));
                 },
             }
