@@ -223,14 +223,7 @@ impl NetworkPacket {
     }
 
     pub fn get_time_elapsed(&self) -> Duration {
-        let tick: u64;
-        let tick_freq: u64;
-        unsafe {
-            tick = skyline::nn::os::GetSystemTick() as u64;
-            tick_freq = utils::get_tick_freq();
-        }
-        let elapsed_ticks = tick - self.timestamp;
-        Duration::from_secs_f64(elapsed_ticks as f64 / tick_freq as f64)
+        utils::duration_since_tick(self.timestamp)
     }
 
     pub fn to_bytes(&self) -> &[u8] {

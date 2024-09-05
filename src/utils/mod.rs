@@ -1,14 +1,16 @@
 use skyline::nn::ui2d::{Pane, TextBox};
-use std::time::Instant;
+use skyline::nn::os::Tick;
+use std::time::{Instant, Duration};
 
 extern "C" {
     #[link_name = "\u{1}_ZN2nn2os22GetSystemTickFrequencyEv"]
     pub fn get_tick_freq() -> u64;
 }
 
-extern "C" {
-    #[link_name = "\u{1}_ZN3app14sv_information11is_ready_goEv"]
-    pub fn is_ready_go() -> bool;
+#[inline]
+pub fn duration_since_tick(tick: Tick) -> Duration {
+    let elapsed_ticks = unsafe { skyline::nn::os::GetSystemTick() } - tick;
+    Duration::from_secs_f64(elapsed_ticks as f64 / unsafe { get_tick_freq() } as f64)
 }
 
 pub fn is_yuzu_emulator() -> bool {

@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::utils::is_ready_go;
+use crate::ldn;
 
 const SEND_PORT: u16 = 3070;
 const LISTEN_PORT: u16 = 3080;
@@ -141,7 +141,6 @@ fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType) {
     let addr = get_network_address(port);
     let socket = UdpSocket::bind(addr).expect("Unable to bind to socket");
     let mut buf = [0; 1024];
-    let packet_interval = Duration::from_secs_f64(0.1);
     while get_network_role() == network_role {
         let poll_start_timestamp = Instant::now();
         let r = match thread_type {
@@ -154,6 +153,10 @@ fn network_loop(network_role: NetworkRole, thread_type: NetworkThreadType) {
 
         //limit the rate the sender thread sends out packets
         if thread_type == NetworkThreadType::Sender {
+            let packet_interval = match ldn::is_in_game() {
+                true => Duration::from_secs_f64(0.5),
+                false => Duration::from_secs_f64(0.1),
+            };
             if poll_start_timestamp.elapsed() < packet_interval {
                 thread::sleep(packet_interval - poll_start_timestamp.elapsed());
             }
