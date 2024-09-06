@@ -20,10 +20,14 @@ Place it in the corresponding folder. This is how it should look:
 - This mod will only work in local online modes. It is intended to be used with yuzu's LDN capabilities to provide an online experience that is very close to the feel of playing offline (and sometimes even identical to offline!)
 - Make sure that yuzu's speed limit is set to 100%. Make sure the previous 120 fps cheat is disabled/removed.
 - Due to a current yuzu bug, make sure to connect to LDN **after** launching smash. Otherwise yuzu will crash when loading the game.
+- As a QOL feature, new smash LDN rooms will be set to have 2 players by default. (You can increase/decrease this yourself)
+- The top of the character select screen will display your selected framerate and delay. It will also show the ping of the room (determined by the average ping of all opponent players). 
+- Under each player you can see their selected framerate and delay. You can also see the ping of each individual players (see bullet point below).
 - In the character select screen, you can do any of the following:
   - Use DPAD left/right to change the online delay set by the game.
   - Use DPAD up/down to change the target framerate. 120 fps removes 3f of delay, 180 fps removes 4 frames of delay, and 240 fps removes 4.5 frames of delay.
   - Press X to toggle VSYNC on/off (only available when playing on 60 fps). This is useful if you dont have a PC capable of reaching higher framerates like 120 fps, but still want to enjoy the lower delay. This can remove upto 3 frames of delay.
+  - Press the right stick to view the individual pings of opponent players. (Displayed under each connected player)
 
 ## Troubleshooting & FAQ
 
@@ -39,3 +43,10 @@ Place it in the corresponding folder. This is how it should look:
   - Shader stutters will happen the first time you do a move/action in yuzu. Yuzu will compile and store these shaders so the next time you do the move, it won't stutter. The more you play the less these stutter will happen. It is recommended that you dedicate a game where you and your opponent will hit each other with all of your moves, so in subsequent games these stutters won't occur.
 
 Check out the [NA](https://discord.gg/jE9hTsmbjD) or [EU](https://discord.gg/yuzu-smash-meet-up-1051577844318339172) yuzu smash discord for more information and also matchmaking!
+
+
+## Known Issues
+- If a players yuzu crashes, or disconnects unexpectedly, the room ping and opponent info (framerate, delay, ping) may not show the correct values or may show under the wrong person. To fix this, the room host will have to exit the room by backing out into the local online menu and create a room again.
+- If 2 or more players are playing on the same yuzu, the opponent info (framerate, delay, ping) may show under the wrong person or not show at all.
+- If you notice any other issues, you can report them here or in the discord servers mentioned above.
+- If you know how to solve these issues, contributions are always welcome.
