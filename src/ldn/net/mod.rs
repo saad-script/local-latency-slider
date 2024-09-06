@@ -55,11 +55,7 @@ fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<()> {
 
     match packet.packet_type {
         NetworkPacketType::Ping => {
-            println!(
-                "Got Ping packet {}: {}",
-                packet.get_timestamp(),
-                packet.get_time_elapsed().as_millis()
-            );
+            println!("Responding to Ping packet from {}...", src_addr.to_string());
             src_addr.set_port(LISTEN_PORT);
             let res_packet = NetworkPacket::create_pong_packet(&packet);
             socket.write(&src_addr, res_packet)?;
@@ -70,7 +66,7 @@ fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<()> {
                 .lock()
                 .unwrap()
                 .register_ping(curr_ping as u64);
-            println!("Got Pong packet {}: {}", packet.get_timestamp(), curr_ping);
+            println!("Got Pong packet ({}): {}", src_addr.to_string(), curr_ping);
 
             let network_info = try_get_network_info()?;
             // Check which player sent the packet and update the ping

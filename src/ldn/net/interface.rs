@@ -196,10 +196,6 @@ pub struct NetworkPacket {
 }
 
 impl NetworkPacket {
-    pub fn get_timestamp(&self) -> u64 {
-        return self.timestamp;
-    }
-
     pub fn create_ping_packet() -> Self {
         let timestamp: u64;
         unsafe {
