@@ -21,7 +21,7 @@ Place it in the corresponding folder. This is how it should look:
 - Make sure that yuzu's speed limit is set to 100%. Make sure the previous 120 fps cheat is disabled/removed.
 - Due to a current yuzu bug, make sure to connect to LDN **after** launching smash. Otherwise yuzu will crash when loading the game.
 - As a QOL feature, new smash LDN rooms will be set to have 2 players by default. (You can increase/decrease this yourself)
-- The top of the character select screen will display your selected framerate and delay. It will also show the ping of the room (determined by the average ping of all opponent players). 
+- The top of the character select screen will display your selected framerate and delay. It will also show the ping of the room (determined by the average ping of all opponent players). Red = Unstable Connection, Yellow = Playable Connection, Green = Stable Connection.
 - Under each player you can see their selected framerate and delay. You can also see the ping of each individual players (see bullet point below).
 - In the character select screen, you can do any of the following:
   - Use DPAD left/right to change the online delay set by the game.
