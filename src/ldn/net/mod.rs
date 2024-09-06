@@ -1,6 +1,6 @@
-mod ext;
+pub mod interface;
 
-use ext::*;
+use interface::*;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::Mutex;
 use std::thread;

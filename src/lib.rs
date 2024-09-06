@@ -9,7 +9,6 @@ use utils::{PaneExt, TextBoxExt};
 #[skyline::hook(offset = 0x1a12f40)]
 unsafe fn update_css(arg: u64) {
     if ldn::is_local_online() {
-
         ldn::latency_slider::poll();
         framerate::poll();
         let delay_str = ldn::latency_slider::current_input_delay().to_string();
