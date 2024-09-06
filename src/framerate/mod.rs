@@ -16,12 +16,18 @@ pub struct FramerateConfig {
 
 impl FramerateConfig {
     pub fn load_from(&self, framerate_config: &FramerateConfig) {
-        self.target_framerate.store(framerate_config.target_framerate.load(Ordering::SeqCst), Ordering::SeqCst);
-        self.is_vsync_enabled.store(framerate_config.is_vsync_enabled.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.target_framerate.store(
+            framerate_config.target_framerate.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        self.is_vsync_enabled.store(
+            framerate_config.is_vsync_enabled.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
     }
     pub const fn default() -> Self {
-        FramerateConfig { 
-            target_framerate: AtomicU32::new(60), 
+        FramerateConfig {
+            target_framerate: AtomicU32::new(60),
             is_vsync_enabled: AtomicBool::new(true),
         }
     }

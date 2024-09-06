@@ -1,6 +1,6 @@
-use skyline::nn::ui2d::{Pane, TextBox};
 use skyline::nn::os::Tick;
-use std::time::{Instant, Duration};
+use skyline::nn::ui2d::{Pane, TextBox};
+use std::time::{Duration, Instant};
 
 extern "C" {
     #[link_name = "\u{1}_ZN2nn2os22GetSystemTickFrequencyEv"]

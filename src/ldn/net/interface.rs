@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::framerate::{self, FramerateConfig};
@@ -240,6 +240,12 @@ impl NetworkPacket {
     }
 }
 
+pub enum NetworkStability {
+    Stable,
+    Inconsistent,
+    Unstable,
+}
+
 #[derive(Debug, Clone)]
 pub struct NetworkDiagnostics {
     pings: [u64; 100],
@@ -276,11 +282,11 @@ impl NetworkDiagnostics {
         }
     }
 
-    pub fn get_network_variance(&self) -> f64 {
+    pub fn get_network_stability(&self) -> NetworkStability {
         let avg = match self.get_avg_ping() {
             Some(a) => a,
             None => {
-                return 0.0;
+                return NetworkStability::Stable;
             }
         };
 
@@ -296,7 +302,13 @@ impl NetworkDiagnostics {
             var_sum as f64 / self.counter as f64
         };
 
-        variance
+        if variance <= 25.0 {
+            return NetworkStability::Stable;
+        } else if variance <= 100.0 {
+            return NetworkStability::Inconsistent;
+        } else {
+            return NetworkStability::Unstable;
+        }
     }
 
     pub fn reset(&mut self) {
@@ -317,14 +329,19 @@ impl PlayerNetInfo {
     pub const fn default() -> Self {
         PlayerNetInfo {
             connected: AtomicBool::new(false),
-            delay: Delay::default(), 
-            framerate_config: FramerateConfig::default(), 
+            delay: Delay::default(),
+            framerate_config: FramerateConfig::default(),
             net_diagnostics: Mutex::new(NetworkDiagnostics::new()),
         }
     }
 
     pub fn set_connected(&self, connected: bool) {
-        if let Ok(_updated) = self.connected.compare_exchange(!connected, connected, Ordering::SeqCst, Ordering::SeqCst) {
+        if let Ok(_updated) = self.connected.compare_exchange(
+            !connected,
+            connected,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
             if !connected {
                 self.net_diagnostics.lock().unwrap().reset();
             }
@@ -332,7 +349,7 @@ impl PlayerNetInfo {
     }
 
     pub fn is_connected(&self) -> bool {
-        return self.connected.load(Ordering::SeqCst)
+        return self.connected.load(Ordering::SeqCst);
     }
 }
 

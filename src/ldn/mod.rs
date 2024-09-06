@@ -56,10 +56,11 @@ unsafe fn update_local_menu(_: &InlineCtx) {
 
 #[skyline::hook(offset = 0x1a261e0)]
 unsafe fn css_player_pane_num_changed(param_1: i64, prev_num: i32, changed_by_player: u32) {
-    if is_local_online() 
+    if is_local_online()
         && CUSTOM_CSS_NUM_PLAYERS_FLAG
-        && changed_by_player == 0 
-        && get_network_role() == NetworkRole::Host {
+        && changed_by_player == 0
+        && get_network_role() == NetworkRole::Host
+    {
         CUSTOM_CSS_NUM_PLAYERS_FLAG = false;
         *((param_1 + 0x160) as *mut i32) = 2;
     }
@@ -83,7 +84,12 @@ unsafe fn on_match_end(_: &InlineCtx) {
 }
 
 fn update_in_game_flag(new_in_game_flag: bool) {
-    let _ = IN_GAME.compare_exchange(!new_in_game_flag, new_in_game_flag, Ordering::SeqCst, Ordering::SeqCst);
+    let _ = IN_GAME.compare_exchange(
+        !new_in_game_flag,
+        new_in_game_flag,
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+    );
 }
 
 pub fn is_local_online() -> bool {

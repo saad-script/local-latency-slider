@@ -94,8 +94,14 @@ fn poll_listener(socket: &UdpSocket, buf: &mut [u8]) -> std::io::Result<()> {
             let player_net_info = &PLAYER_NET_STATS[player_index];
             player_net_info.set_connected(true);
             player_net_info.delay.load_from(&packet.delay);
-            player_net_info.framerate_config.load_from(&packet.framerate_config);
-            player_net_info.net_diagnostics.lock().unwrap().register_ping(curr_ping as u64);
+            player_net_info
+                .framerate_config
+                .load_from(&packet.framerate_config);
+            player_net_info
+                .net_diagnostics
+                .lock()
+                .unwrap()
+                .register_ping(curr_ping as u64);
         }
     }
 
@@ -227,9 +233,7 @@ unsafe fn on_network_destroyed() {
     println!("Network Destroyed");
 }
 
-pub fn get_player_net_info<'a>(
-    player_index: usize,
-) -> &'static PlayerNetInfo {
+pub fn get_player_net_info<'a>(player_index: usize) -> &'static PlayerNetInfo {
     &PLAYER_NET_STATS[player_index]
 }
 
