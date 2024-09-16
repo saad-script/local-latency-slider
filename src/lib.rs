@@ -72,7 +72,11 @@ unsafe fn update_css(arg: u64) {
             let player_net_info = ldn::net::get_player_net_info(player_index);
             match player_net_info.is_connected() {
                 true => {
-                    if ninput::any::is_press(ninput::Buttons::STICK_R) {
+                    let is_stick_pressed = ninput::any::is_press(ninput::Buttons::STICK_L)
+                        || ninput::any::is_press(ninput::Buttons::STICK_R);
+                    let is_triggers_pressed = ninput::any::is_press(ninput::Buttons::L)
+                        && ninput::any::is_press(ninput::Buttons::R);
+                    if is_stick_pressed || is_triggers_pressed {
                         let avg_ping = match player_net_info
                             .net_diagnostics
                             .lock()

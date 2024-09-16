@@ -27,7 +27,7 @@ Place it in the corresponding folder. This is how it should look:
   - Use DPAD left/right to change the online delay set by the game.
   - Use DPAD up/down to change the target framerate. 120 fps removes 3f of delay, 180 fps removes 4 frames of delay, and 240 fps removes 4.5 frames of delay.
   - Press X to toggle VSYNC on/off (only available when playing on 60 fps). This is useful if you dont have a PC capable of reaching higher framerates like 120 fps, but still want to enjoy the lower delay. This can remove upto 3 frames of delay.
-  - Press the right stick to view the individual pings of opponent players. (Displayed under each connected player)
+  - Press either the left or right control stick to view the individual pings of opponent players. Altervatively, if you are playing on a gamecube controller you can press L + R at the same time to show the individual pings. (Displayed under each connected player)
 
 ## Troubleshooting & FAQ
 
