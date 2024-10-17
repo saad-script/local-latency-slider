@@ -1,7 +1,7 @@
 pub mod latency_slider;
 pub mod net;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::framerate;
 use crate::ldn::net::interface::{get_network_role, NetworkRole};
@@ -9,29 +9,29 @@ use crate::utils::TextBoxExt;
 use skyline::hooks::InlineCtx;
 use skyline::nn::ui2d::Pane;
 
-static mut LOCAL_ROOM_PANE_HANDLE: Option<*mut Pane> = None;
 static mut CUSTOM_CSS_NUM_PLAYERS_FLAG: bool = false;
 
+static LOCAL_ROOM_PANE_HANDLE: AtomicU64 = AtomicU64::new(0);
 // workaround for sv_information::is_ready_go() being unreliable for ldn in some cases
 static IN_GAME: AtomicBool = AtomicBool::new(false);
 
 #[skyline::hook(offset = 0x22d9d10, inline)]
 unsafe fn online_melee_any_scene_create(_: &InlineCtx) {
-    LOCAL_ROOM_PANE_HANDLE = None;
+    LOCAL_ROOM_PANE_HANDLE.store(0, Ordering::SeqCst);
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
 
 #[skyline::hook(offset = 0x22d9c40, inline)]
 unsafe fn bg_matchmaking_seq(_: &InlineCtx) {
-    LOCAL_ROOM_PANE_HANDLE = None;
+    LOCAL_ROOM_PANE_HANDLE.store(0, Ordering::SeqCst);
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
 
 #[skyline::hook(offset = 0x235a650, inline)]
 unsafe fn main_menu(_: &InlineCtx) {
-    LOCAL_ROOM_PANE_HANDLE = None;
+    LOCAL_ROOM_PANE_HANDLE.store(0, Ordering::SeqCst);
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
@@ -42,15 +42,18 @@ unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
     update_in_game_flag(false);
     CUSTOM_CSS_NUM_PLAYERS_FLAG = true;
     let handle = *((*((*ctx.registers[0].x.as_ref() + 8) as *const u64) + 0x10) as *const u64);
-    LOCAL_ROOM_PANE_HANDLE = Some(handle as *mut Pane);
+    LOCAL_ROOM_PANE_HANDLE.store(handle, Ordering::SeqCst);
 }
 
 #[skyline::hook(offset = 0x1bd7a80, inline)]
 unsafe fn update_local_menu(_: &InlineCtx) {
-    if let Some(p) = LOCAL_ROOM_PANE_HANDLE {
+    let pane_handle = LOCAL_ROOM_PANE_HANDLE.load(Ordering::SeqCst) as *mut u64 as *mut Pane;
+    if !pane_handle.is_null() {
         latency_slider::poll();
         let delay_str = latency_slider::current_input_delay().to_string();
-        (*p).as_textbox().set_text_string(&format!("{}", delay_str));
+        (*pane_handle)
+            .as_textbox()
+            .set_text_string(&format!("{}", delay_str));
     }
 }
 
@@ -93,9 +96,7 @@ fn update_in_game_flag(new_in_game_flag: bool) {
 }
 
 pub fn is_local_online() -> bool {
-    unsafe {
-        return LOCAL_ROOM_PANE_HANDLE.is_some();
-    }
+    return LOCAL_ROOM_PANE_HANDLE.load(Ordering::SeqCst) > 0;
 }
 
 pub fn is_in_game() -> bool {
