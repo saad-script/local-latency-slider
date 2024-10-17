@@ -15,21 +15,21 @@ static mut CUSTOM_CSS_NUM_PLAYERS_FLAG: bool = false;
 // workaround for sv_information::is_ready_go() being unreliable for ldn in some cases
 static IN_GAME: AtomicBool = AtomicBool::new(false);
 
-#[skyline::hook(offset = 0x22d9cf0, inline)]
+#[skyline::hook(offset = 0x22d9d10, inline)]
 unsafe fn online_melee_any_scene_create(_: &InlineCtx) {
     LOCAL_ROOM_PANE_HANDLE = None;
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
 
-#[skyline::hook(offset = 0x22d9c20, inline)]
+#[skyline::hook(offset = 0x22d9c40, inline)]
 unsafe fn bg_matchmaking_seq(_: &InlineCtx) {
     LOCAL_ROOM_PANE_HANDLE = None;
     framerate::set_framerate_target(60);
     framerate::set_vsync_enabled(true);
 }
 
-#[skyline::hook(offset = 0x235a630, inline)]
+#[skyline::hook(offset = 0x235a650, inline)]
 unsafe fn main_menu(_: &InlineCtx) {
     LOCAL_ROOM_PANE_HANDLE = None;
     framerate::set_framerate_target(60);
@@ -37,7 +37,7 @@ unsafe fn main_menu(_: &InlineCtx) {
 }
 
 // called on local online menu init
-#[skyline::hook(offset = 0x1bd45c0, inline)]
+#[skyline::hook(offset = 0x1bd45e0, inline)]
 unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
     update_in_game_flag(false);
     CUSTOM_CSS_NUM_PLAYERS_FLAG = true;
@@ -45,7 +45,7 @@ unsafe fn store_local_menu_pane(ctx: &InlineCtx) {
     LOCAL_ROOM_PANE_HANDLE = Some(handle as *mut Pane);
 }
 
-#[skyline::hook(offset = 0x1bd7a60, inline)]
+#[skyline::hook(offset = 0x1bd7a80, inline)]
 unsafe fn update_local_menu(_: &InlineCtx) {
     if let Some(p) = LOCAL_ROOM_PANE_HANDLE {
         latency_slider::poll();
@@ -54,7 +54,7 @@ unsafe fn update_local_menu(_: &InlineCtx) {
     }
 }
 
-#[skyline::hook(offset = 0x1a261e0)]
+#[skyline::hook(offset = 0x1a26200)]
 unsafe fn css_player_pane_num_changed(param_1: i64, prev_num: i32, changed_by_player: u32) {
     if is_local_online()
         && CUSTOM_CSS_NUM_PLAYERS_FLAG
@@ -75,7 +75,7 @@ unsafe fn on_match_start(_: &InlineCtx) {
     update_in_game_flag(true);
 }
 
-#[skyline::hook(offset = 0x1d68b74, inline)]
+#[skyline::hook(offset = 0x1d68b94, inline)]
 unsafe fn on_match_end(_: &InlineCtx) {
     if !is_local_online() {
         return;

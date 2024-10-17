@@ -42,7 +42,7 @@ pub fn poll_buttons(buttons: &[ninput::Buttons]) -> ninput::Buttons {
     return ninput::Buttons::empty();
 }
 
-#[skyline::from_offset(0x37a1ef0)]
+#[skyline::from_offset(0x37a1f10)]
 fn set_text_string(pane: *mut Pane, string: *const u8);
 
 #[skyline::from_offset(0x59970)]

@@ -6,7 +6,7 @@ use skyline::nn::ui2d::Pane;
 
 use utils::{PaneExt, TextBoxExt};
 
-#[skyline::hook(offset = 0x1a12f40)]
+#[skyline::hook(offset = 0x1a12f60)]
 unsafe fn update_css(arg: u64) {
     if ldn::is_local_online() {
         ldn::latency_slider::poll();

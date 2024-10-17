@@ -66,7 +66,7 @@ unsafe fn on_game_speed_calc(_: &InlineCtx) {
     set_internal_framerate(3600 / FRAMERATE_CONFIG.target_framerate.load(Ordering::SeqCst));
 }
 
-#[skyline::hook(offset = 0x374777c, inline)]
+#[skyline::hook(offset = 0x374779c, inline)]
 unsafe fn scene_update(_: &InlineCtx) {
     static mut PREV_TICK: Option<skyline::nn::os::Tick> = None;
     if !ldn::is_local_online() {
