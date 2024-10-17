@@ -287,9 +287,9 @@ impl NetworkDiagnostics {
         };
 
         let mut var_sum: u64 = 0;
-        let end = if self.filled { self.counter + 1 } else { 100 };
+        let end = if self.filled { 100 } else { self.counter + 1 };
         for i in 0..end {
-            var_sum = (self.pings[i] - avg) * (self.pings[i] - avg)
+            var_sum += (self.pings[i] - avg) * (self.pings[i] - avg)
         }
 
         let variance = if self.filled {
@@ -308,8 +308,10 @@ impl NetworkDiagnostics {
     }
 
     pub fn reset(&mut self) {
-        self.filled = false;
+        self.pings = [0; 100];
         self.counter = 0;
+        self.sum = 0;
+        self.filled = false;
     }
 }
 
