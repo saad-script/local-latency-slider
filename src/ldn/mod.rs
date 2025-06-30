@@ -78,7 +78,7 @@ unsafe fn on_match_start(_: &InlineCtx) {
     update_in_game_flag(true);
 }
 
-#[skyline::hook(offset = 0x1d68b94, inline)]
+#[skyline::hook(offset = 0x1d68f24, inline)]
 unsafe fn on_match_end(_: &InlineCtx) {
     if !is_local_online() {
         return;
