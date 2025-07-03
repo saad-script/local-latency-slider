@@ -66,7 +66,7 @@ unsafe fn on_game_speed_calc(_: &InlineCtx) {
     set_internal_framerate(3600 / FRAMERATE_CONFIG.target_framerate.load(Ordering::SeqCst));
 }
 
-#[skyline::hook(offset = 0x374779c, inline)]
+#[skyline::hook(offset = 0x3747b7c, inline)]
 unsafe fn scene_update(_: &InlineCtx) {
     static mut PREV_TICK: Option<skyline::nn::os::Tick> = None;
     if !ldn::is_local_online() {
@@ -93,7 +93,7 @@ unsafe fn scene_update(_: &InlineCtx) {
 
 unsafe fn set_swap_interval(swap_interval: i32) {
     let base_addr = skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as u64;
-    let r = *((base_addr + 0x6d43430) as *const u64);
+    let r = *((base_addr + 0x6D42430) as *const u64);
     let r = *((r + 0x10) as *const u64);
     let r = (r + 0xF14) as *mut i32;
     *r = swap_interval;
@@ -101,7 +101,7 @@ unsafe fn set_swap_interval(swap_interval: i32) {
 
 unsafe fn set_internal_framerate(internal_framerate: u32) {
     let base_addr = skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as u64;
-    let internal_frame_rate_addr = base_addr + 0x523d004;
+    let internal_frame_rate_addr = base_addr + 0x523C004;
     *(internal_frame_rate_addr as *mut u32) = internal_framerate
 }
 
