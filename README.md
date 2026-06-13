@@ -1,5 +1,5 @@
 
-> ⚠️ **This mod is outdated. It is recommended to use [SSBU Online Deluxe](https://github.com/saad-script/ssbu-online-deluxe)** instead.         
+> ⚠️ **This mod is outdated. It is recommended to use [SSBU Online Deluxe](https://github.com/saad-script/ssbu-online-deluxe) instead.**
 
 I took blue-dev's code for the original arena latency slider mod and modified it so that it only works with local online. I also added in options to change the game's framerate to get even lower input delay. You can see the [original readme](./ORIGINAL_README.md) to get details as to how exactly the mod changes the online latency.
 
